@@ -1,12 +1,12 @@
+import GraphCanvas from "./components/GraphCanvas";
+import Sidebar from "./components/Sidebar";
+
 export default function Home() {
-
-
-  
-
   return (
-    <main className="flex min-h-screen flex-col items-center justify-between p-24">
-      <div className="z-10 w-full max-w-5xl items-center justify-between font-mono text-sm lg:flex">
-        <h1 className="text-4xl font-bold">Welcome to GenAI App</h1>
+    <main className="flex h-screen w-screen overflow-hidden">
+      <Sidebar />
+      <div className="flex-1 relative">
+        <GraphCanvas />
       </div>
     </main>
   );

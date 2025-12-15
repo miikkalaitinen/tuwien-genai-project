@@ -24,6 +24,7 @@ const mockedges = [
 ];
 
 export default function GraphCanvas() {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [nodes, setNodes, onNodesChange] = useNodesState(mocknodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(mockedges);
 

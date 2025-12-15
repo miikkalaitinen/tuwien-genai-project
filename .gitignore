@@ -1,0 +1,18 @@
+# Environment variables (API Keys)
+.env
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.pyc
+
+# Local data (PDFs and Vector Database)
+data/
+chroma_db/
+
+# System files
+.DS_Store
+
+# Virtual environments
+venv/
+env/
+.venv/

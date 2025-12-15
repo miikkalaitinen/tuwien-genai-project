@@ -1,0 +1,16 @@
+# Core GenAI & Orchestration
+llama-index
+openai
+chromadb
+
+# Frontend & Visualization
+streamlit
+streamlit-agraph  # Good for simple graphs
+# or: gravis
+
+# Data Handling
+pandas
+PyMuPDF           # For reliable PDF parsing (fitz)
+
+# Utilities
+python-dotenv     # To load the .env file

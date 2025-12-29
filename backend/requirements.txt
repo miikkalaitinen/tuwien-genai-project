@@ -1,8 +1,20 @@
-llama-index
-openai
-chromadb
-pandas
-PyMuPDF
-python-dotenv
+# Research Paper Navigator - Backend Dependencies
+# Python 3.10+
+
+# =============================================================================
+# Jaime's dependencies (PDF Ingestion & Chunking)
+# =============================================================================
+llama-parse>=0.4.0
+python-dotenv>=1.0.0
+
+# =============================================================================
+# TODO: Marta - Add your dependencies below
+# Suggested: llama-index, chromadb, openai
+# =============================================================================
+
+# =============================================================================
+# TODO: Miikka - Add your dependencies below  
+# Suggested: fastapi, uvicorn, pydantic, python-multipart
+# =============================================================================
 fastapi
-uvicorn[standard]
+uvicorn

@@ -7,9 +7,11 @@ Provides:
 - ChromaDB persistent vector store for embeddings
 - Pydantic schemas for strict JSON output
 - Retry logic for rate limit handling
+- RAG functions for storing and retrieving papers
 
 Usage:
     from src.utils import get_llm, PaperMetadata, RelationshipResult
+    from src.utils import store_paper_embedding, find_similar_papers
 """
 
 import os
@@ -170,7 +172,7 @@ def get_groq_llm() -> LLM:
 
 def get_gemini_llm_fallback() -> LLM:
     """
-    Fallback a Gemini si Groq no está disponible.
+    Fallback to Gemini if Groq is not available.
     """
     api_key = os.getenv("GOOGLE_API_KEY")
     if not api_key:
@@ -206,7 +208,7 @@ def get_embedding_model():
         except Exception:
             pass
     
-    # Fallback: usar embeddings locales de HuggingFace
+    # Fallback: use local HuggingFace embeddings
     from llama_index.embeddings.huggingface import HuggingFaceEmbedding
     embedding = HuggingFaceEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
     Settings.embed_model = embedding
@@ -307,3 +309,121 @@ def get_vector_store() -> chromadb.PersistentClient:
     if _chroma_client is None:
         _chroma_client = get_chroma_client()
     return _chroma_client
+
+
+# =============================================================================
+# RAG Functions (Store & Retrieve Papers)
+# =============================================================================
+
+def store_paper_embedding(
+    paper_id: str,
+    paper_text: str,
+    metadata: dict | None = None,
+    collection_name: str = "paper_embeddings"
+) -> None:
+    """
+    Store a paper's embedding in ChromaDB for similarity search.
+    
+    Args:
+        paper_id: Unique identifier for the paper (e.g., filename)
+        paper_text: The text content to embed (abstract + methodology recommended)
+        metadata: Optional metadata dict (title, authors, etc.)
+        collection_name: ChromaDB collection name
+    """
+    client = get_vector_store()
+    collection = get_or_create_collection(client, collection_name)
+    
+    # Check if paper already exists
+    existing = collection.get(ids=[paper_id])
+    if existing and existing["ids"]:
+        # Update existing
+        collection.update(
+            ids=[paper_id],
+            documents=[paper_text],
+            metadatas=[metadata or {}]
+        )
+    else:
+        # Add new
+        collection.add(
+            ids=[paper_id],
+            documents=[paper_text],
+            metadatas=[metadata or {}]
+        )
+
+
+def find_similar_papers(
+    query_text: str,
+    n_results: int = 5,
+    collection_name: str = "paper_embeddings"
+) -> list[dict]:
+    """
+    Find papers similar to the query text using vector similarity.
+    
+    Args:
+        query_text: Text to search for (e.g., a paper's abstract)
+        n_results: Number of similar papers to return
+        collection_name: ChromaDB collection name
+        
+    Returns:
+        List of dicts with 'id', 'text', 'metadata', 'distance'
+    """
+    client = get_vector_store()
+    collection = get_or_create_collection(client, collection_name)
+    
+    results = collection.query(
+        query_texts=[query_text],
+        n_results=n_results
+    )
+    
+    papers = []
+    if results and results["ids"] and results["ids"][0]:
+        for i, paper_id in enumerate(results["ids"][0]):
+            papers.append({
+                "id": paper_id,
+                "text": results["documents"][0][i] if results["documents"] else "",
+                "metadata": results["metadatas"][0][i] if results["metadatas"] else {},
+                "distance": results["distances"][0][i] if results["distances"] else 0.0
+            })
+    
+    return papers
+
+
+def get_all_papers(collection_name: str = "paper_embeddings") -> list[dict]:
+    """
+    Retrieve all stored papers from ChromaDB.
+    
+    Returns:
+        List of dicts with 'id', 'text', 'metadata'
+    """
+    client = get_vector_store()
+    collection = get_or_create_collection(client, collection_name)
+    
+    results = collection.get()
+    
+    papers = []
+    if results and results["ids"]:
+        for i, paper_id in enumerate(results["ids"]):
+            papers.append({
+                "id": paper_id,
+                "text": results["documents"][i] if results["documents"] else "",
+                "metadata": results["metadatas"][i] if results["metadatas"] else {}
+            })
+    
+    return papers
+
+
+def delete_paper(paper_id: str, collection_name: str = "paper_embeddings") -> bool:
+    """
+    Delete a paper from ChromaDB.
+    
+    Returns:
+        True if deleted, False if not found
+    """
+    client = get_vector_store()
+    collection = get_or_create_collection(client, collection_name)
+    
+    try:
+        collection.delete(ids=[paper_id])
+        return True
+    except Exception:
+        return False

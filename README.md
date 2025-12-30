@@ -24,8 +24,9 @@ source venv/bin/activate  # Windows: venv\Scripts\activate
 # Install dependencies
 pip install -r requirements.txt
 
-# Configure API key
+# Configure API keys
 echo "LLAMA_CLOUD_API_KEY=your_key_here" > .env
+echo "GOOGLE_API_KEY=your_gemini_key_here" >> .env
 ```
 
 ### Add PDFs to Process

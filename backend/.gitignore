@@ -1,18 +1,38 @@
-# Environment variables (API Keys)
+# Environment variables (API Keys - NEVER COMMIT)
 .env
+.env.local
+.env.*.local
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+*.so
 
 # Local data (PDFs and Vector Database)
 data/
 chroma_db/
 
+# Debug outputs (regenerated during testing)
+debug_markdowns/
+processed_papers.json
+
 # System files
 .DS_Store
+Thumbs.db
 
 # Virtual environments
 venv/
 env/
 .venv/
+.conda/
+
+# IDE settings (optional - team may want to share)
+.idea/
+*.swp
+*.swo
+
+# Test artifacts
+.pytest_cache/
+.coverage
+htmlcov/

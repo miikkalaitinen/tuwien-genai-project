@@ -33,6 +33,7 @@ ENV/
 backend/data/*.pdf
 backend/debug_markdowns/
 backend/chroma_db/
+backend/paper_graph.json
 
 # =============================================================================
 # IDE & Editor

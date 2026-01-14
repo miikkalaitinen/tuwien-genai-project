@@ -34,45 +34,31 @@ export default function GraphCanvas({ nodes: initialNodes, edges: initialEdges, 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
-useEffect(() => {
-  const styledEdges: Edge[] = initialEdges.map((edge) => {
-    const relationType = edge.data?.relation_type || 'Default';
-    console.log('Styling edge with relation type:', edge);
-    const color = RELATION_COLORS[relationType] || RELATION_COLORS.Default;
+  useEffect(() => {
+    const styledEdges: Edge[] = initialEdges.map((edge) => {
+      const relationType = edge.data?.relation_type || 'Default';
+      const color = RELATION_COLORS[relationType] || RELATION_COLORS.Default;
 
-    return {
-      ...edge,
-      type: 'smoothstep', 
-      label: relationType,
-      animated: relationType === 'Extends',
-      
-      style: {
-        stroke: color,
-        strokeWidth: 2,
-      },
+      return {
+        ...edge,
+        type: 'straight',
+        animated: relationType === 'Extends',
+        style: {
+          stroke: color,
+          strokeWidth: 2,
+          strokeDasharray: '0',
+        },
+        markerEnd: {
+          type: MarkerType.ArrowClosed,
+          color: color,
+        },
+        data: { ...edge.data },
+      };
+    });
 
-      markerEnd: {
-        type: MarkerType.ArrowClosed,
-        width: 20,
-        height: 20,
-        color: color,
-      },
-
-      labelStyle: { 
-        fill: color, 
-        fontWeight: 700 
-      },
-    };
-  });
-
-  setNodes(initialNodes);
-  setEdges(styledEdges);
-}, [initialNodes, initialEdges, setNodes, setEdges]);
-
-  const onConnect = useCallback(
-    (params: Edge | Connection) => setEdges((eds) => addEdge(params, eds)),
-    [setEdges],
-  );
+    setNodes(initialNodes);
+    setEdges(styledEdges);
+  }, [initialNodes, initialEdges]);
 
   return (
     <div className="w-full h-screen bg-gray-600 relative">
@@ -117,7 +103,6 @@ useEffect(() => {
         edges={edges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
-        onConnect={onConnect}
         fitView
       >
         <Background />

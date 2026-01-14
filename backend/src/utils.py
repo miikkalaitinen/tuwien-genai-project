@@ -390,6 +390,41 @@ def find_similar_papers(
     return papers
 
 
+def get_papers_by_ids(
+    paper_ids: list[str],
+    collection_name: str = "paper_embeddings"
+) -> list[dict]:
+    """
+    Retrieve specific papers from ChromaDB by ID.
+    
+    Args:
+        paper_ids: List of paper IDs to retrieve
+        collection_name: ChromaDB collection name
+        
+    Returns:
+        List of dicts with 'id', 'text', 'metadata'
+    """
+    if not paper_ids:
+        return []
+        
+    client = get_vector_store()
+    collection = get_or_create_collection(client, collection_name)
+    
+    # ChromaDB .get(ids=...) returns only matches
+    results = collection.get(ids=paper_ids)
+    
+    papers = []
+    if results and results["ids"]:
+        for i, paper_id in enumerate(results["ids"]):
+            papers.append({
+                "id": paper_id,
+                "text": results["documents"][i] if results["documents"] else "",
+                "metadata": results["metadatas"][i] if results["metadatas"] else {}
+            })
+            
+    return papers
+
+
 def get_all_papers(collection_name: str = "paper_embeddings") -> list[dict]:
     """
     Retrieve all stored papers from ChromaDB.

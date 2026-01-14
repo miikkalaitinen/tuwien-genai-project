@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState } from 'react';
-import { Upload, BookOpen, Microscope, FileText, Trash, Scale, List } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Upload, BookOpen, Microscope, FileText, Trash } from 'lucide-react';
 import { Node, Edge } from "reactflow";
 import { ProcessBatchResponse, ProcessBatchStartResponse } from '../types';
 
@@ -15,8 +15,8 @@ interface SidebarProps {
 export default function Sidebar({ onGraphUpdate, setLoading, onProgressUpdate, loading }: SidebarProps) {
     
   const [user, setUser] = useState<'student' | 'researcher'>('student');
-  const [mode, setMode] = useState<'summarise' | 'critique'>('summarise');
   const [files, setFiles] = useState<File[]>([]);
+  const [paperIds, setPaperIds] = useState<string[]>([]);
 
   const handleSelectFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -24,13 +24,65 @@ export default function Sidebar({ onGraphUpdate, setLoading, onProgressUpdate, l
     }
   }
 
-  const fetchResults = async (formData: FormData) => {
-    const response = await fetch("http://localhost:8000/graph", {
-      method: "POST",
-      body: formData,
-    });
-    return response.json();
+  const handleUpdateGraph = async () => {
+    if (paperIds.length === 0 || loading) return;
+    
+    setLoading(true);
+    try {
+      const response = await fetch("http://localhost:8000/graph", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          mode: user,
+          paper_ids: paperIds
+        }),
+      });
+      
+      const startData: ProcessBatchStartResponse = await response.json();
+      const jobId = startData.job_id;
+
+      let processing = true;
+      while (processing) {
+        const statusResponse = await fetch(`http://localhost:8000/batch-status/${jobId}`);
+        const statusData: ProcessBatchResponse = await statusResponse.json();
+        
+        onProgressUpdate(statusData);
+
+        if (statusData.status === 'completed' && statusData.result) {
+          const nodesWithPos = statusData.result.nodes.map((node, index) => ({
+            ...node,
+            position: { x: 100 * (index % 5), y: 100 * Math.floor(index / 5) }
+          }));
+
+          setPaperIds(statusData.result.nodes.map(n => n.id));
+
+          onGraphUpdate({
+            nodes: nodesWithPos, 
+            edges: statusData.result.edges 
+          });
+          processing = false;
+        } else if (statusData.status === 'failed') {
+          console.error("Graph update failed:", statusData);
+          processing = false;
+        } else {
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+      }
+    } catch (error) {
+      console.error("Graph update failed:", error);
+    } finally {
+      setLoading(false);
+      onProgressUpdate(null);
+    }
   };
+
+  useEffect(() => {
+    if (paperIds.length > 0) {
+      handleUpdateGraph();
+    }
+  }, [user]);
 
   const handleGenerateGraph = async () => {
     if (files.length === 0) return;
@@ -42,7 +94,6 @@ export default function Sidebar({ onGraphUpdate, setLoading, onProgressUpdate, l
       formData.append("files", file); 
     });
     
-    formData.append("mode", mode);
     formData.append("user_type", user);
 
     try {
@@ -66,6 +117,8 @@ export default function Sidebar({ onGraphUpdate, setLoading, onProgressUpdate, l
             ...node,
             position: { x: 100 * (index % 5), y: 100 * Math.floor(index / 5) }
           }));
+
+          setPaperIds(statusData.result.nodes.map(n => n.id));
 
           onGraphUpdate({
             nodes: nodesWithPos, 
@@ -93,7 +146,7 @@ export default function Sidebar({ onGraphUpdate, setLoading, onProgressUpdate, l
       <h1 className="text-xl font-bold mb-6 text-gray-400">Research Navigator</h1>
       <div className="mb-8">
         <label className="text-xs font-semibold text-gray-300 uppercase tracking-wider mb-3 block">
-          User Type
+          Perspective
         </label>
         <div className="flex bg-gray-600 p-1 rounded-lg">
           <button
@@ -122,31 +175,11 @@ export default function Sidebar({ onGraphUpdate, setLoading, onProgressUpdate, l
       </div>
       <div className="mb-8">
         <label className="text-xs font-semibold text-gray-300 uppercase tracking-wider mb-3 block">
-          Mode
+          How it works
         </label>
-        <div className="flex bg-gray-600 p-1 rounded-lg">
-          <button
-            onClick={() => setMode('summarise')}
-            className={`flex-1 flex items-center cursor-pointer justify-center py-2 text-sm font-medium rounded-md transition-all ${
-              mode === 'summarise' ? 'bg-gray-800 text-blue-500' : 'text-gray-300 hover:text-gray-100 hover:bg-gray-500'
-            }`}
-          >
-            <List className="w-4 h-4 mr-2" />
-            Summarise
-          </button>
-          <button
-            onClick={() => setMode('critique')}
-            className={`flex-1 flex items-center cursor-pointer justify-center py-2 text-sm font-medium rounded-md transition-all ${
-              mode === 'critique' ? 'bg-gray-800 text-red-500' : 'text-gray-300 hover:text-gray-100 hover:bg-gray-500'
-            }`}
-          >
-            <Scale className="w-4 h-4 mr-2" />
-            Critique
-          </button>
-        </div>
-        <p className="text-xs text-gray-400 mt-2 italic">
-          { mode === 'summarise' && "Provides concise summaries of key points." }
-          { mode === 'critique' && "Analyzes strengths and weaknesses." }
+        <p className="text-xs text-gray-400 leading-relaxed italic">
+          Upload your PDFs to begin; the AI then parses semantic findings and maps 
+          relationships based on your chosen user perspective.
         </p>
       </div>
       <div className="mb-6">

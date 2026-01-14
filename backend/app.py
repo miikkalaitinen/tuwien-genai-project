@@ -2,13 +2,6 @@
 Module: FastAPI Application (Main Entry Point)
 Owner: Miikka (Frontend & Visualization Developer)
 
-TODO for Miikka:
-- Add file upload endpoints for PDF processing
-- Integrate with connection_engine.py for relationship detection
-- Add endpoints for graph data retrieval
-- Implement Student/Researcher mode toggle
-
-The PDF processing pipeline is ready.
 """
 
 import warnings
@@ -18,9 +11,10 @@ import shutil
 import uuid
 import hashlib
 from pathlib import Path
-from typing import List, Literal, Dict, Any
+from typing import List, Literal, Dict, Any, Optional
 import os
 
+from pydantic import BaseModel
 from fastapi import FastAPI, UploadFile, File, HTTPException, Form, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -40,6 +34,10 @@ UPLOAD_DIR = Path("data")
 UPLOAD_DIR.mkdir(exist_ok=True)
 
 job_store: Dict[str, Dict[str, Any]] = {}
+
+class GraphRequest(BaseModel):
+    mode: Literal["student", "researcher"] = "student"
+    paper_ids: Optional[List[str]] = None
 
 app = FastAPI(
     title="Research Paper Navigator API",
@@ -133,6 +131,61 @@ def process_batch_task(job_id: str, files_info: List[Dict[str, Any]], user_type:
         job_store[job_id]["status"] = "failed"
         job_store[job_id]["error"] = str(e)
 
+def regenerate_graph_task(job_id: str, request: GraphRequest):
+    """
+    Background worker function to regenerate graph from existing papers.
+    """
+    mode = request.mode
+    paper_ids = request.paper_ids
+    
+    logger.info(f"Job {job_id}: Regenerating graph in mode: {mode}")
+    
+    try:
+        job_store[job_id]["status"] = "processing"
+        job_store[job_id]["progress"] = 10
+        job_store[job_id]["current_file"] = "Fetching papers..."
+
+        from src.utils import get_all_papers, get_papers_by_ids
+        
+        if paper_ids:
+            db_papers = get_papers_by_ids(paper_ids)
+        else:
+            db_papers = get_all_papers()
+        
+        processed_papers = []
+        for p in db_papers:
+            processed_papers.append({
+                "filename": p["id"],
+                "original_filename": p["metadata"].get("original_filename") or p["id"],
+                "metadata": {
+                    "methodology": p["metadata"].get("methodology"),
+                    "key_result": p["metadata"].get("key_result"),
+                    "core_theory": p["metadata"].get("core_theory"),
+                },
+                "file_path": "",
+                "extraction_success": True 
+            })
+
+        job_store[job_id]["progress"] = 50
+        job_store[job_id]["current_file"] = "Building Graph..."
+
+        graph_data = build_paper_graph(
+            processed_papers=processed_papers, 
+            mode=mode,
+            confidence_threshold=0.5,
+            use_similar_papers=True 
+        )
+        
+        job_store[job_id]["result"] = graph_data
+        job_store[job_id]["status"] = "completed"
+        job_store[job_id]["progress"] = 100
+        logger.info(f"Job {job_id}: Completed successfully")
+        
+    except Exception as e:
+        logger.error(f"Job {job_id}: Failed with error: {e}")
+        job_store[job_id]["status"] = "failed"
+        job_store[job_id]["error"] = str(e)
+
 @app.get("/")
 def root():
     return {"message": "Research Paper Navigator API"}
@@ -146,7 +199,6 @@ def health_check():
 async def process_batch(
     background_tasks: BackgroundTasks,
     files: List[UploadFile] = File(...),
-    mode: str = Form(...),
     user_type: str = Form(...)
 ):
     """
@@ -210,31 +262,30 @@ def get_batch_status(job_id: str):
         raise HTTPException(status_code=404, detail="Job not found")
         
     return job
-    
-@app.get("/graph")
-def get_graph(mode: Literal["student", "researcher"] = "student"):
+
+@app.post("/graph")
+async def make_graph(request: GraphRequest, background_tasks: BackgroundTasks):
     """
-    Regenerates the graph for the previously uploaded papers 
-    using a different perspective.
+    Initiates asynchronous graph regeneration.
+    Returns a job_id immediately. Use /batch-status/{job_id} to check progress.
     """
-    logger.info(f"Regenerating graph in mode: {mode}")
+    job_id = str(uuid.uuid4())
+    logger.info(f"Received graph regeneration request. Job ID: {job_id}")
+
+    job_store[job_id] = {
+        "status": "queued",
+        "progress": 0,
+        "current_file": "Initializing...",
+        "created_at": str(uuid.uuid1())
+    }
     
-    try:
-        papers = load_processed_papers("processed_papers.json")
-        
-        graph_data = build_paper_graph(
-            processed_papers=papers, 
-            mode=mode,
-            confidence_threshold=0.5
-        )
-        
-        return graph_data
-        
-    except FileNotFoundError:
-        return {"nodes": [], "edges": []}
-    except Exception as e:
-        logger.error(f"Mode switch failed: {e}")
-        raise HTTPException(status_code=500, detail="Failed to regenerate graph")
+    background_tasks.add_task(regenerate_graph_task, job_id, request)
+    
+    return {
+        "job_id": job_id,
+        "status": "queued",
+        "message": "Graph regeneration started."
+    }
     
 @app.get("/search")
 def search_papers(query: str, limit: int = 5):

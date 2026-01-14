@@ -164,7 +164,7 @@ def process_single_paper(
                 try:
                     store_paper_embedding(
                         paper_id=filename,
-                        text=paper_text[:4000],  # Limit text length for embedding
+                        paper_text=paper_text[:4000],  # Limit text length for embedding
                         metadata=result["metadata"]
                     )
                     logger.info(f"Stored embedding for: {filename}")

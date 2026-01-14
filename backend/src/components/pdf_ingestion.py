@@ -15,6 +15,10 @@ from typing import Dict, Any
 
 from dotenv import load_dotenv
 from llama_parse import LlamaParse
+import nest_asyncio
+
+# Apply nest_asyncio to allow nested event loops (required for LlamaParse in FastAPI)
+nest_asyncio.apply()
 
 # Configure module-level logger
 logger = logging.getLogger(__name__)

@@ -38,7 +38,9 @@ load_dotenv()
 # =============================================================================
 BACKEND_ROOT = Path(__file__).parent.parent
 DATA_DIR = BACKEND_ROOT / "data"
+DATA_DIR.mkdir(exist_ok=True)
 CHROMA_PERSIST_DIR = BACKEND_ROOT / "chroma_db"
+CHROMA_PERSIST_DIR.mkdir(exist_ok=True)
 
 # =============================================================================
 # Pydantic Schemas for Strict JSON Output

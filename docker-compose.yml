@@ -2,25 +2,22 @@ version: "3.8"
 
 services:
   backend:
-    platform: linux/amd64
     build:
       context: ./backend
-      dockerfile: Dockerfile
-    container_name: fastapi_backend
+    platform: linux/amd64
     ports:
       - "8000:8000"
     volumes:
       - ./backend:/app
-    environment:
-      - PYTHONUNBUFFERED=1
-    command: uvicorn app:app --host 0.0.0.0 --port 8000 --reload
+    env_file:
+      - ./backend/.env
 
   frontend:
-    platform: linux/amd64
     build:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: nextjs_frontend
+    platform: linux/amd64
     ports:
       - "3000:3000"
     volumes:
@@ -29,7 +26,7 @@ services:
     environment:
       - CHOKIDAR_USEPOLLING=true
       - WATCHPACK_POLLING=true
-      - NEXT_PUBLIC_API_URL=http://backend:8000
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
     depends_on:
       - backend
     command: npm run dev

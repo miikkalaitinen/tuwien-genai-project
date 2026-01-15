@@ -1,6 +1,5 @@
 """
 Module: Student Mode Prompts
-Owner: Aarne (Prompt Engineer & QA Specialist)
 
 TODO for Aarne:
 - Design System Prompts for Student perspective
@@ -14,7 +13,6 @@ Available sections from chunking pipeline:
 
 from typing import Dict
 
-# Placeholder - Aarne to implement
 STUDENT_PROMPTS: Dict[str, str] = {
     "system": "",
     "extraction": "",

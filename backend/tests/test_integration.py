@@ -1,10 +1,6 @@
 # backend/tests/test_integration.py
 """
-Integration Test: Full Pipeline (Jaime + Marta)
-
-Flow:
-1. Jaime: PDF → Markdown → Chunks (semantic sections)
-2. Marta: Chunks → Metadata → Relationships between papers
+Integration Test for analysis pipeline
 """
 
 import sys
@@ -27,7 +23,7 @@ def test_full_pipeline():
     """Test completo: 2 PDFs → extracción → comparación."""
     
     print("=" * 60)
-    print("🧪 INTEGRATION TEST: Jaime + Marta")
+    print("🧪 Integration Test: Full Analysis Pipeline")
     print("=" * 60)
     
     # Find available PDFs
@@ -45,11 +41,8 @@ def test_full_pipeline():
     print(f"\n📄 Paper A: {pdf_a.name}")
     print(f"📄 Paper B: {pdf_b.name}")
     
-    # =========================================================================
-    # STEP 1: Jaime's Pipeline (PDF → Chunks)
-    # =========================================================================
     print("\n" + "=" * 60)
-    print("📥 STEP 1: Processing PDFs (Jaime's Pipeline)")
+    print("📥 STEP 1: Processing PDF")
     print("=" * 60)
     
     chunker = SemanticChunker()
@@ -73,12 +66,9 @@ def test_full_pipeline():
     except Exception as e:
         print(f"   ❌ Error processing Paper B: {e}")
         return
-    
-    # =========================================================================
-    # STEP 2: Marta's Engine (Extract Metadata with LLM)
-    # =========================================================================
+
     print("\n" + "=" * 60)
-    print("🧠 STEP 2: Extracting Metadata (Marta's Engine)")
+    print("🧠 STEP 2: Extracting Metadata")
     print("=" * 60)
     
     def prepare_text_for_llm(chunks: dict) -> str:

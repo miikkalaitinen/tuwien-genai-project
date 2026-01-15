@@ -1,41 +1,24 @@
-# Research Paper Navigator - Backend Dependencies
-# Python 3.10+
-
-# =============================================================================
-# Base & Utilities (Matemáticas y Configuración)
-# =============================================================================
+# --- Base & Utils ---
 python-dotenv
-pandas
-numpy
 pydantic
+nest_asyncio
 
-# =============================================================================
-# Jaime's dependencies (PDF Ingestion)
-# =============================================================================
-llama-parse
-
-# =============================================================================
-# Marta's dependencies (AI Backend & Reasoning)
-# =============================================================================
-# El cerebro principal
-llama-index
-llama-index-core
-
-# Conexión con Groq (gratis, sin límites restrictivos)
-llama-index-llms-groq
-
-# Conexión con Google Gemini (backup)
-llama-index-llms-gemini
-llama-index-embeddings-gemini
-google-generativeai
-
-# Base de datos vectorial
-chromadb
-llama-index-vector-stores-chroma
-
-# =============================================================================
-# Miikka's dependencies (API Server)
-# =============================================================================
+# --- FastAPI Server ---
 fastapi
 uvicorn
 python-multipart
+h11==0.16.0
+httpcore==1.0.9
+httpx==0.28.1
+
+# --- LlamaIndex Core ---
+llama-index-core==0.12.52
+llama-parse==0.5.10
+
+# --- AI Integrations ---
+llama-index-llms-gemini
+llama-index-embeddings-gemini
+
+# --- AI Integrations (Groq & Chroma) ---
+llama-index-llms-groq==0.3.2
+chromadb==1.4.0

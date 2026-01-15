@@ -1,6 +1,5 @@
 """
 Prompts Package
-Owner: Aarne (Prompt Engineer & QA Specialist)
 """
 
 from src.prompts.student_prompts import STUDENT_PROMPTS

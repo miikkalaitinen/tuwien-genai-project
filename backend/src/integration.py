@@ -1,9 +1,7 @@
 """
-Module: Integration Layer
-Owner: Jaime (Data Pipeline Engineer)
 
-Bridges the PDF ingestion pipeline with the AI connection engine.
-Takes processed_papers.json output and feeds it to Marta's extraction/synthesis functions.
+Bridges the PDF ingestion pipeline with the AI engine.
+Takes processed_papers.json output and feeds it to extraction/synthesis functions.
 
 Usage:
     from src.integration import process_papers_for_graph, build_paper_graph
@@ -20,14 +18,9 @@ import logging
 from pathlib import Path
 from typing import Any, Literal
 
-# Import from Jaime's modules
-from src.components.chunking import SemanticChunker
-
-# Import from Marta's modules
 from src.components.connection_engine import extract_paper_metadata, synthesize_relationship
 from src.utils import PaperMetadata, RelationshipResult, store_paper_embedding, find_similar_papers
 
-# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -64,7 +57,7 @@ def prepare_paper_text(paper: dict[str, Any], sections_to_use: list[str] | None 
     Args:
         paper: Paper dictionary from processed_papers.json
         sections_to_use: List of section names to include. 
-                        Defaults to ["abstract", "methodology", "results"]
+                        Defaults to ["abstract", "methodology", "results", "introduction"]
     
     Returns:
         Combined text from selected sections
@@ -74,6 +67,9 @@ def prepare_paper_text(paper: dict[str, Any], sections_to_use: list[str] | None 
         sections_to_use = ["abstract", "methodology", "results", "introduction"]
     
     sections = paper.get("sections", {})
+    if not sections:
+        return ""
+
     combined_parts = []
     
     for section_name in sections_to_use:
@@ -82,11 +78,11 @@ def prepare_paper_text(paper: dict[str, Any], sections_to_use: list[str] | None 
             combined_parts.append(f"## {section_name.title()}\n{content}")
     
     if not combined_parts:
-        # Fallback: use any available section
+        # Fallback: use all available sections if specific ones weren't found
+        logger.debug(f"No priority sections found for {paper.get('filename')}. Using all available sections.")
         for name, content in sections.items():
             if content and content.strip():
                 combined_parts.append(f"## {name.title()}\n{content}")
-                break
     
     return "\n\n".join(combined_parts)
 
@@ -117,6 +113,19 @@ def process_single_paper(
         by default. Mode is applied during relationship synthesis.
     """
     filename = paper.get("filename", "Unknown")
+    
+    # Check for previous pipeline errors
+    if paper.get("status") == "error":
+        logger.warning(f"Skipping {filename}: Previous step failed ({paper.get('error_msg', 'unknown error')})")
+        return {
+            "filename": filename,
+            "file_path": "",
+            "sections": {},
+            "extraction_success": False,
+            "metadata": None,
+            "error": "ingestion_failed"
+        }
+
     logger.info(f"Processing paper: {filename}")
     
     # Prepare text for extraction - limit to ~4000 chars to stay within Groq free tier (6000 tokens)
@@ -128,6 +137,7 @@ def process_single_paper(
     
     result = {
         "filename": filename,
+        "original_filename": paper.get("original_filename"),
         "file_path": paper.get("metadata", {}).get("file_path", ""),
         "sections": paper.get("sections", {}),
         "extraction_success": False,
@@ -139,7 +149,7 @@ def process_single_paper(
         return result
     
     try:
-        # Call Marta's extraction function (uses student prompts by default)
+        # Call extraction function (uses student prompts by default)
         extracted = extract_paper_metadata(paper_text)
         
         if extracted:
@@ -152,7 +162,7 @@ def process_single_paper(
                 try:
                     store_paper_embedding(
                         paper_id=filename,
-                        text=paper_text[:4000],  # Limit text length for embedding
+                        paper_text=paper_text[:4000],  # Limit text length for embedding
                         metadata=result["metadata"]
                     )
                     logger.info(f"Stored embedding for: {filename}")
@@ -231,7 +241,7 @@ def synthesize_paper_relationship(
         return None
     
     try:
-        # Call Marta's synthesis function
+        # Call synthesis function
         relationship = synthesize_relationship(meta_a, meta_b, mode=mode)
         
         if relationship:
@@ -280,10 +290,13 @@ def build_paper_graph(
     # Build nodes
     nodes = []
     for paper in valid_papers:
+        # Use original filename for display label if available
+        label = paper.get("original_filename") or paper["filename"].replace(".pdf", "")
+
         nodes.append({
             "id": paper["filename"],
             "data": {
-                "label": paper["filename"].replace(".pdf", ""),
+                "label": label,
                 "metadata": paper["metadata"],
                 "file_path": paper["file_path"]
             }

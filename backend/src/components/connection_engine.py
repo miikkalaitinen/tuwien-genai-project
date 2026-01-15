@@ -1,6 +1,5 @@
 """
 Module: Connection Engine
-Owner: Marta (AI Backend Architect)
 
 Provides:
 - extract_paper_metadata(): Extract structured metadata from paper text using LLM
@@ -23,13 +22,13 @@ from src.utils import (
     retry_with_backoff,
 )
 
-# Import prompts from Aarne's module (with fallback placeholders)
+# Import prompts
 from src.prompts.student_prompts import STUDENT_PROMPTS
 from src.prompts.researcher_prompts import RESEARCHER_PROMPTS
 
 
 # =============================================================================
-# Fallback Prompts (Used if Aarne's prompts are empty)
+# Fallback Prompts
 # =============================================================================
 
 _FALLBACK_EXTRACTION_PROMPT = """You are an expert academic researcher analyzing scientific papers.
@@ -129,7 +128,6 @@ def extract_paper_metadata(paper_text: str) -> PaperMetadata:
     
     Args:
         paper_text: Full text or relevant sections of a research paper
-                   (typically from Jaime's chunking pipeline)
     
     Returns:
         PaperMetadata: Validated Pydantic model with extracted fields
@@ -140,7 +138,7 @@ def extract_paper_metadata(paper_text: str) -> PaperMetadata:
     """
     llm = get_llm()
     
-    # Get extraction prompt (from Aarne or fallback)
+    # Get extraction prompt
     extraction_prompt = _get_prompt(
         STUDENT_PROMPTS,  # Use student prompts for extraction (more general)
         "extraction",
@@ -148,14 +146,7 @@ def extract_paper_metadata(paper_text: str) -> PaperMetadata:
     )
     
     # Construct the full prompt
-    full_prompt = f"""{extraction_prompt}
-
-Paper text:
-\"\"\"
-{paper_text}
-\"\"\"
-
-Return ONLY the JSON object, no other text."""
+    full_prompt = f"""{extraction_prompt}\n\nPaper text:\n\"\"\"{paper_text}\n\"\"\"\n\nReturn ONLY the JSON object, no other text."""
     
     # Call the LLM with retry for rate limits
     def _call_llm():
@@ -246,8 +237,10 @@ def synthesize_relationship(
 
 Return ONLY the JSON object, no other text."""
     
-    # Call the LLM
-    response = llm.complete(full_prompt)
+    def _call_llm():
+        return llm.complete(full_prompt)
+    
+    response = retry_with_backoff(_call_llm, 5, 5, 60)
     response_text = str(response)
     
     # Parse and validate the response

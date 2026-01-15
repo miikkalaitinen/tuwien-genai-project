@@ -8,10 +8,6 @@ Logic (Waterfall/Sticky):
    CURRENT section - do not reset to 'other' just because the header lacks keywords.
 3. Only transition to a new section when a strong keyword is detected.
 
-Owner: Jaime (Data Pipeline Engineer)
-
-Note: The core algorithm has been validated. Changes should focus on keyword
-tuning, not structural modifications to the waterfall logic.
 """
 
 import logging

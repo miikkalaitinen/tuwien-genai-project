@@ -1,9 +1,7 @@
 """
-Module: PDF Ingestion (LlamaParse Edition)
-Responsibility: Send PDFs to LlamaCloud to get structured Markdown.
-Owner: Jaime (Data Pipeline Engineer)
+Module: PDF Ingestion
 
-This module provides a robust PDF-to-Markdown conversion pipeline using
+This module provides a PDF-to-Markdown conversion pipeline using
 the LlamaParse API. It handles document extraction with proper error
 handling and logging for production use.
 """
@@ -15,6 +13,10 @@ from typing import Dict, Any
 
 from dotenv import load_dotenv
 from llama_parse import LlamaParse
+import nest_asyncio
+
+# Apply nest_asyncio to allow nested event loops (required for LlamaParse in FastAPI)
+nest_asyncio.apply()
 
 # Configure module-level logger
 logger = logging.getLogger(__name__)

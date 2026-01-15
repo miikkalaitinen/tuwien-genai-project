@@ -1,14 +1,11 @@
 """
-Module: Batch Processor CLI
-Responsibility: Process multiple PDFs and output structured JSON with debug artifacts.
+Batch Processor CLI
 
 This is a CLI utility for batch processing research papers. It:
 1. Ingests PDFs from a data directory using LlamaParse
 2. Applies semantic chunking to extract sections
 3. Saves structured JSON output
 4. Optionally saves raw Markdown for debugging
-
-Owner: Jaime (Data Pipeline Engineer)
 
 Usage:
     python -m src.batch_processor                    # Process all PDFs

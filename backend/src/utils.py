@@ -1,6 +1,5 @@
 """
 Module: Utilities
-Owner: Marta (AI Backend Architect)
 
 Provides:
 - LLM client via LlamaIndex (Groq primary, Gemini fallback)
@@ -14,10 +13,11 @@ Usage:
     from src.utils import store_paper_embedding, find_similar_papers
 """
 
+import logging
 import os
 import time
 from pathlib import Path
-from typing import Any, Callable, Literal, Optional, TypeVar
+from typing import Any, Callable, Dict, Literal, Optional, TypeVar
 
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
@@ -38,7 +38,12 @@ load_dotenv()
 # =============================================================================
 BACKEND_ROOT = Path(__file__).parent.parent
 DATA_DIR = BACKEND_ROOT / "data"
+DATA_DIR.mkdir(exist_ok=True)
 CHROMA_PERSIST_DIR = BACKEND_ROOT / "chroma_db"
+CHROMA_PERSIST_DIR.mkdir(exist_ok=True)
+
+
+job_store: Dict[str, Dict[str, Any]] = {}
 
 # =============================================================================
 # Pydantic Schemas for Strict JSON Output
@@ -98,6 +103,7 @@ def retry_with_backoff(
     max_retries: int = 3,
     base_delay: float = 2.0,
     max_delay: float = 60.0,
+    job_id: Optional[str] = None
 ) -> T:
     """
     Execute a function with exponential backoff retry on rate limit errors.
@@ -127,6 +133,8 @@ def retry_with_backoff(
                 if attempt < max_retries:
                     delay = min(base_delay * (2 ** attempt), max_delay)
                     print(f"⏳ Rate limit hit, waiting {delay:.1f}s before retry ({attempt + 1}/{max_retries})...")
+                    if job_id:
+                        job_store[job_id]["status"] = "ratelimit"
                     time.sleep(delay)
                     continue
             # If not a rate limit error, raise immediately
@@ -196,6 +204,8 @@ def get_embedding_model():
     """
     # Try Gemini first
     api_key = os.getenv("GOOGLE_API_KEY")
+    print("Embedding API Key:", "Set" if api_key else "Not Set")
+
     if api_key:
         try:
             from llama_index.embeddings.gemini import GeminiEmbedding
@@ -208,9 +218,19 @@ def get_embedding_model():
         except Exception:
             pass
     
-    # Fallback: use local HuggingFace embeddings
     from llama_index.embeddings.huggingface import HuggingFaceEmbedding
-    embedding = HuggingFaceEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
+    local_path = "/app/local_models/all-MiniLM-L6-v2"
+
+    embedding = HuggingFaceEmbedding(model_name=local_path)
+    # if os.path.exists(local_model_path):
+    #     embedding = HuggingFaceEmbedding(model_name=local_model_path)
+    # else:
+    #     logging.warning(
+    #         "Local model not found at './local_models/all-MiniLM-L6-v2'. "
+    #         "Falling back to online model (this may be slow)."
+    #     )
+    #     embedding = HuggingFaceEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
+
     Settings.embed_model = embedding
     return embedding
 
@@ -385,6 +405,41 @@ def find_similar_papers(
                 "distance": results["distances"][0][i] if results["distances"] else 0.0
             })
     
+    return papers
+
+
+def get_papers_by_ids(
+    paper_ids: list[str],
+    collection_name: str = "paper_embeddings"
+) -> list[dict]:
+    """
+    Retrieve specific papers from ChromaDB by ID.
+    
+    Args:
+        paper_ids: List of paper IDs to retrieve
+        collection_name: ChromaDB collection name
+        
+    Returns:
+        List of dicts with 'id', 'text', 'metadata'
+    """
+    if not paper_ids:
+        return []
+        
+    client = get_vector_store()
+    collection = get_or_create_collection(client, collection_name)
+    
+    # ChromaDB .get(ids=...) returns only matches
+    results = collection.get(ids=paper_ids)
+    
+    papers = []
+    if results and results["ids"]:
+        for i, paper_id in enumerate(results["ids"]):
+            papers.append({
+                "id": paper_id,
+                "text": results["documents"][i] if results["documents"] else "",
+                "metadata": results["metadatas"][i] if results["metadatas"] else {}
+            })
+            
     return papers
 
 

@@ -1,7 +1,4 @@
-# backend/tests/test_marta.py
 """
-Unit Test: Marta's Connection Engine
-
 Tests extract_paper_metadata() and synthesize_relationship() with mock data.
 """
 
@@ -15,7 +12,7 @@ def test_connection_engine():
     print("🧪 UNIT TEST: Connection Engine")
     print("=" * 50)
     
-    # Mock paper data (simulates Jaime's pipeline output)
+
     paper_a_text = """
     Title: Deep Learning in Medicine
     Abstract: We propose a new Transformer model called MedBERT to diagnose cancer.

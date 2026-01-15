@@ -1,6 +1,5 @@
 """
 Module: Utilities
-Owner: Marta (AI Backend Architect)
 
 Provides:
 - LLM client via LlamaIndex (Groq primary, Gemini fallback)

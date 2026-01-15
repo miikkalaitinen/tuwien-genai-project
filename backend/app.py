@@ -1,9 +1,4 @@
-"""
-Module: FastAPI Application (Main Entry Point)
-Owner: Miikka (Frontend & Visualization Developer)
-
-"""
-
+# filter out stupid pydantic warning crying about deprications in packages
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning, module="pydantic")
 
@@ -18,7 +13,7 @@ from pydantic import BaseModel
 from fastapi import FastAPI, UploadFile, File, HTTPException, Form, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 
-# Jaime's and Marta's backend modules
+# PDF processing modules
 from src.integration import process_single_paper, build_paper_graph
 from src.utils import find_similar_papers, get_papers_by_ids
 from src.components.pdf_ingestion import PDFIngestor

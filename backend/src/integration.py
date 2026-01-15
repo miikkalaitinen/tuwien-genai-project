@@ -1,9 +1,7 @@
 """
-Module: Integration Layer
-Owner: Jaime (Data Pipeline Engineer)
 
-Bridges the PDF ingestion pipeline with the AI connection engine.
-Takes processed_papers.json output and feeds it to Marta's extraction/synthesis functions.
+Bridges the PDF ingestion pipeline with the AI engine.
+Takes processed_papers.json output and feeds it to extraction/synthesis functions.
 
 Usage:
     from src.integration import process_papers_for_graph, build_paper_graph
@@ -151,7 +149,7 @@ def process_single_paper(
         return result
     
     try:
-        # Call Marta's extraction function (uses student prompts by default)
+        # Call extraction function (uses student prompts by default)
         extracted = extract_paper_metadata(paper_text)
         
         if extracted:
@@ -243,7 +241,7 @@ def synthesize_paper_relationship(
         return None
     
     try:
-        # Call Marta's synthesis function
+        # Call synthesis function
         relationship = synthesize_relationship(meta_a, meta_b, mode=mode)
         
         if relationship:

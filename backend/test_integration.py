@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """
-Quick Integration Test: Jaime's Pipeline + Marta's Connection Engine
 
 Tests:
-1. Load processed_papers.json (Jaime's output)
-2. Extract metadata using Marta's extract_paper_metadata()
+1. Load processed_papers.json
+2. Extract metadata using extract_paper_metadata()
 3. Synthesize relationship between 2 papers
 4. Output graph structure
 
@@ -21,7 +20,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 def test_integration():
     print("=" * 60)
-    print("🧪 Integration Test: Jaime's Pipeline + Marta's Engine")
+    print("🧪 Integration Test: Analysis Pipeline")
     print("=" * 60)
     
     # Step 1: Test imports
@@ -40,7 +39,7 @@ def test_integration():
         print(f"   ❌ Import failed: {e}")
         return False
     
-    # Step 2: Load processed papers (Jaime's output)
+    # Step 2: Load processed papers
     print("\n[2/5] Loading processed_papers.json...")
     try:
         papers = load_processed_papers("processed_papers.json")
@@ -52,7 +51,7 @@ def test_integration():
         print("      Run: python -m src.batch_processor data/ --output processed_papers.json")
         return False
     
-    # Step 3: Test LLM connection (Marta's Groq)
+    # Step 3: Test LLM connection
     print("\n[3/5] Testing Groq LLM connection...")
     try:
         llm = get_llm()

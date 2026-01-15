@@ -1,9 +1,7 @@
 """
-Module: PDF Ingestion (LlamaParse Edition)
-Responsibility: Send PDFs to LlamaCloud to get structured Markdown.
-Owner: Jaime (Data Pipeline Engineer)
+Module: PDF Ingestion
 
-This module provides a robust PDF-to-Markdown conversion pipeline using
+This module provides a PDF-to-Markdown conversion pipeline using
 the LlamaParse API. It handles document extraction with proper error
 handling and logging for production use.
 """

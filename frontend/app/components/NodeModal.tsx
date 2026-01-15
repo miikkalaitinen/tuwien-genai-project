@@ -28,15 +28,15 @@ export const NodeModal = ({ selectedNode, closeModal }: NodeModalProps) => {
             </div>
           </div>
           <div className="mb-3">
-            <span className="font-semibold text-gray-900">Key Result:</span>
-            <div className="mt-2 px-3 py-2 rounded bg-gray-100 text-gray-900 whitespace-pre-line border border-gray-200">
-              {selectedNode.data?.metadata?.key_result}
-            </div>
-          </div>
-          <div className="mb-3">
             <span className="font-semibold text-gray-900">Methodology:</span>
             <div className="mt-2 px-3 py-2 rounded bg-gray-100 text-gray-900 whitespace-pre-line border border-gray-200">
               {selectedNode.data?.metadata?.methodology}
+            </div>
+          </div>
+          <div className="mb-3">
+            <span className="font-semibold text-gray-900">Key Result:</span>
+            <div className="mt-2 px-3 py-2 rounded bg-gray-100 text-gray-900 whitespace-pre-line border border-gray-200">
+              {selectedNode.data?.metadata?.key_result}
             </div>
           </div>
         </div>

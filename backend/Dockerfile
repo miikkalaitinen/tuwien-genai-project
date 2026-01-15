@@ -8,7 +8,7 @@ RUN apt-get update && apt-get install -y \
   && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
-RUN pip install --upgrade pip
+COPY ./local_models /app/local_models
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .

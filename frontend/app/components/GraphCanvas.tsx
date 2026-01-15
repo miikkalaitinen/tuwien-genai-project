@@ -1,19 +1,20 @@
 'use client'
 
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import ReactFlow, { 
   Background, 
   Controls, 
   useNodesState,
   useEdgesState, 
-  addEdge,
-  Connection,
   Edge,
   Node, 
   MarkerType
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { ProcessBatchResponse } from '../types';
+import CustomEdge from './CustomEdge';
+import { EdgeModal } from './EdgeModal';
+import { NodeModal } from './NodeModal';
 
 interface GraphCanvasProps {
   nodes: Node[];
@@ -29,10 +30,26 @@ const RELATION_COLORS: Record<string, string> = {
   Default: '#94a3b8'
 };
 
+const edgeTypes = {
+  custom: CustomEdge,
+};
+
 export default function GraphCanvas({ nodes: initialNodes, edges: initialEdges, loading, loadingProgress }: GraphCanvasProps) {
   
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+  const [openModal, setOpenModal] = useState<Node | Edge | null>(null);
+
+
+  // Function to check if modalOpen is type Edge
+  const isEdge = (item: Node | Edge | null): item is Edge => {
+    return item !== null && 'source' in item && 'target' in item;
+  };
+
+  // Function to check if modalOpen is type Node
+  const isNode = (item: Node | Edge | null): item is Node => {
+    return item !== null && 'position' in item;
+  };
 
   useEffect(() => {
     const styledEdges: Edge[] = initialEdges.map((edge) => {
@@ -41,7 +58,7 @@ export default function GraphCanvas({ nodes: initialNodes, edges: initialEdges, 
 
       return {
         ...edge,
-        type: 'straight',
+        type: 'custom',
         animated: relationType === 'Extends',
         style: {
           stroke: color,
@@ -52,6 +69,7 @@ export default function GraphCanvas({ nodes: initialNodes, edges: initialEdges, 
           type: MarkerType.ArrowClosed,
           color: color,
         },
+        label: relationType !== 'Default' ? relationType : '',
         data: { ...edge.data },
       };
     });
@@ -59,6 +77,16 @@ export default function GraphCanvas({ nodes: initialNodes, edges: initialEdges, 
     setNodes(initialNodes);
     setEdges(styledEdges);
   }, [initialNodes, initialEdges]);
+
+  const handleEdgeClick = useCallback((event: React.MouseEvent, edge: Edge) => {
+    event.stopPropagation();
+    setOpenModal(edge);
+  }, []);
+
+  const handleNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
+    event.stopPropagation();
+    setOpenModal(node);
+  }, []);
 
   return (
     <div className="w-full h-screen bg-gray-600 relative">
@@ -103,11 +131,29 @@ export default function GraphCanvas({ nodes: initialNodes, edges: initialEdges, 
         edges={edges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
+        onEdgeClick={handleEdgeClick}
+        onNodeClick={handleNodeClick}
         fitView
+        edgeTypes={edgeTypes}
       >
         <Background />
         <Controls />
       </ReactFlow>
+
+      {openModal && isEdge(openModal) && openModal && (
+        <EdgeModal
+          selectedEdge={openModal} 
+          nodes={nodes} 
+          closeModal={() => setOpenModal(null)} 
+        />
+      )}
+
+      {openModal && isNode(openModal) && (
+        <NodeModal
+          selectedNode={openModal} 
+          closeModal={() => setOpenModal(null)} 
+        />
+      )}
     </div>
   );
 }

@@ -148,14 +148,7 @@ def extract_paper_metadata(paper_text: str) -> PaperMetadata:
     )
     
     # Construct the full prompt
-    full_prompt = f"""{extraction_prompt}
-
-Paper text:
-\"\"\"
-{paper_text}
-\"\"\"
-
-Return ONLY the JSON object, no other text."""
+    full_prompt = f"""{extraction_prompt}\n\nPaper text:\n\"\"\"{paper_text}\n\"\"\"\n\nReturn ONLY the JSON object, no other text."""
     
     # Call the LLM with retry for rate limits
     def _call_llm():
@@ -246,8 +239,10 @@ def synthesize_relationship(
 
 Return ONLY the JSON object, no other text."""
     
-    # Call the LLM
-    response = llm.complete(full_prompt)
+    def _call_llm():
+        return llm.complete(full_prompt)
+    
+    response = retry_with_backoff(_call_llm, 5, 5, 60)
     response_text = str(response)
     
     # Parse and validate the response

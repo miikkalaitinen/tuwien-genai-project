@@ -19,11 +19,12 @@ from fastapi import FastAPI, UploadFile, File, HTTPException, Form, BackgroundTa
 from fastapi.middleware.cors import CORSMiddleware
 
 # Jaime's and Marta's backend modules
-from src.integration import process_single_paper, build_paper_graph, load_processed_papers
-from src.utils import find_similar_papers
+from src.integration import process_single_paper, build_paper_graph
+from src.utils import find_similar_papers, get_papers_by_ids
 from src.components.pdf_ingestion import PDFIngestor
 from src.components.chunking import SemanticChunker
 import logging
+from src.utils import job_store
 
 # Log stuff
 logging.basicConfig(level=logging.INFO)
@@ -32,8 +33,6 @@ logger = logging.getLogger("uvicorn")
 # Create upload directory if it doesn't exist
 UPLOAD_DIR = Path("data")
 UPLOAD_DIR.mkdir(exist_ok=True)
-
-job_store: Dict[str, Dict[str, Any]] = {}
 
 class GraphRequest(BaseModel):
     mode: Literal["student", "researcher"] = "student"
@@ -53,6 +52,8 @@ async def startup_event():
         logger.warning("GROQ_API_KEY is missing! Using Gemini fallback for LLM tasks.")
         if not os.getenv("GOOGLE_API_KEY") or "your-key-here" in os.getenv("GOOGLE_API_KEY"):
             logger.warning("GOOGLE_API_KEY is also missing! LLM tasks will fail.")
+    if not os.getenv("GOOGLE_API_KEY") or "your-key-here" in os.getenv("GOOGLE_API_KEY"):
+        logger.warning("GOOGLE_API_KEY is missing! Using HuggingFace fallback for embeddings, (SLOW!)")
 
 # CORS for frontend
 app.add_middleware(
@@ -82,6 +83,23 @@ def process_batch_task(job_id: str, files_info: List[Dict[str, Any]], user_type:
             job_store[job_id]["current_file"] = original_name
             
             try:
+                # Check if paper already exists in DB
+                filename = file_path.name
+                existing_papers = get_papers_by_ids([filename])
+                
+                if existing_papers:
+                    logger.info(f"Paper {original_name} ({filename}) already exists in DB. Skipping processing.")
+                    existing = existing_papers[0]
+                    processed_files.append({
+                        "filename": filename,
+                        "original_filename": original_name,
+                        "file_path": str(file_path),
+                        "sections": {},
+                        "extraction_success": True,
+                        "metadata": existing["metadata"]
+                    })
+                    continue
+
                 ingestor = PDFIngestor(str(file_path))
                 full_markdown = ingestor.extract_clean_text()
                 
@@ -172,8 +190,7 @@ def regenerate_graph_task(job_id: str, request: GraphRequest):
         graph_data = build_paper_graph(
             processed_papers=processed_papers, 
             mode=mode,
-            confidence_threshold=0.5,
-            use_similar_papers=True 
+            confidence_threshold=0.6,
         )
         
         job_store[job_id]["result"] = graph_data

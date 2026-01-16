@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Upload, BookOpen, Microscope, FileText, Trash } from 'lucide-react';
 import { Node, Edge } from "reactflow";
 import { ProcessBatchResponse, ProcessBatchStartResponse } from '../types';

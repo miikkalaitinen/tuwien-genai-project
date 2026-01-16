@@ -117,7 +117,7 @@ def _parse_json_from_response(response_text: str) -> dict:
 # Main Functions
 # =============================================================================
 
-def extract_paper_metadata(paper_text: str) -> PaperMetadata:
+def extract_paper_metadata(paper_text: str, mode: Literal["student", "researcher"] = "student") -> PaperMetadata:
     """
     Extract structured metadata from paper text using LLM.
     
@@ -128,6 +128,7 @@ def extract_paper_metadata(paper_text: str) -> PaperMetadata:
     
     Args:
         paper_text: Full text or relevant sections of a research paper
+        mode: Extraction mode ("student" or "researcher") linked to specific prompt sets
     
     Returns:
         PaperMetadata: Validated Pydantic model with extracted fields
@@ -138,11 +139,19 @@ def extract_paper_metadata(paper_text: str) -> PaperMetadata:
     """
     llm = get_llm()
     
+    # Select prompts based on mode
+    if mode == "student":
+        prompts = STUDENT_PROMPTS
+        fallback_prompt = _FALLBACK_EXTRACTION_PROMPT
+    else:
+        prompts = RESEARCHER_PROMPTS
+        fallback_prompt = _FALLBACK_EXTRACTION_PROMPT
+
     # Get extraction prompt
     extraction_prompt = _get_prompt(
-        STUDENT_PROMPTS,  # Use student prompts for extraction (more general)
+        prompts,
         "extraction",
-        _FALLBACK_EXTRACTION_PROMPT
+        fallback_prompt
     )
     
     # Construct the full prompt
@@ -254,14 +263,14 @@ Return ONLY the JSON object, no other text."""
 # Batch Processing Helpers
 # =============================================================================
 
-def extract_metadata_safe(paper_text: str) -> PaperMetadata | None:
+def extract_metadata_safe(paper_text: str, mode: Literal["student", "researcher"] = "student") -> PaperMetadata | None:
     """
     Safe wrapper for extract_paper_metadata that returns None on failure.
     
     Useful for batch processing where some papers might fail.
     """
     try:
-        return extract_paper_metadata(paper_text)
+        return extract_paper_metadata(paper_text, mode=mode)
     except (ValidationError, json.JSONDecodeError, Exception) as e:
         print(f"Warning: Failed to extract metadata: {e}")
         return None

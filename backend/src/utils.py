@@ -301,11 +301,11 @@ def get_llm() -> LLM:
     if _llm_instance is None:
         try:
             _llm_instance = get_groq_llm()
-            print("✅ Using Groq (Llama 3.1)")
+            print("Using Groq (Llama 3.1)")
         except ValueError:
             try:
                 _llm_instance = get_gemini_llm_fallback()
-                print("✅ Using Gemini (fallback)")
+                print("Using Gemini (fallback)")
             except ValueError as e:
                 raise ValueError(
                     "No API key found. Configure at least one:\n"

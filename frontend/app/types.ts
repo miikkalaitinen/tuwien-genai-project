@@ -40,6 +40,7 @@ export interface ProcessBatchResponse {
   total_files: number;
   created_at: string;
   result: GraphResult | null;
+    error?: string;
 }
 
 export interface ProcessBatchStartResponse {

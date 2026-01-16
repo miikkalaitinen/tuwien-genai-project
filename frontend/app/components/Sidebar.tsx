@@ -10,22 +10,29 @@ interface SidebarProps {
   setLoading: (loading: boolean) => void;
   onProgressUpdate: (progress: ProcessBatchResponse | null) => void;
   loading: boolean;
+  onError: (msg: string) => void;
 }
   
-export default function Sidebar({ onGraphUpdate, setLoading, onProgressUpdate, loading }: SidebarProps) {
+export default function Sidebar({ onGraphUpdate, setLoading, onProgressUpdate, loading, onError }: SidebarProps) {
     
   const [user, setUser] = useState<'student' | 'researcher'>('student');
+  const [lastGeneration, setLastGeneration] = useState<{ user: 'student' | 'researcher', files: File[] } | null>(null);
   const [files, setFiles] = useState<File[]>([]);
-  const [paperIds, setPaperIds] = useState<string[]>([]);
+  const [papers, setPapers] = useState<{id: string, name: string}[]>([]);
 
   const handleSelectFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
-      setFiles(Array.from(e.target.files));
+      const newFiles = Array.from(e.target.files);
+      setFiles(prevFiles => {
+        const existingNames = new Set(prevFiles.map(f => f.name));
+        const uniqueNewFiles = newFiles.filter(f => !existingNames.has(f.name));
+        return [...prevFiles, ...uniqueNewFiles];
+      });
     }
   }
 
   const handleUpdateGraph = async () => {
-    if (paperIds.length === 0 || loading) return;
+    if (papers.length === 0 || loading) return;
     
     setLoading(true);
     try {
@@ -36,16 +43,25 @@ export default function Sidebar({ onGraphUpdate, setLoading, onProgressUpdate, l
         },
         body: JSON.stringify({
           mode: user,
-          paper_ids: paperIds
+          papers: papers
         }),
       });
       
+      if (!response.ok) {
+        throw new Error(`Failed to start graph update (${response.status})`);
+      }
+
       const startData: ProcessBatchStartResponse = await response.json();
       const jobId = startData.job_id;
 
       let processing = true;
       while (processing) {
         const statusResponse = await fetch(`http://localhost:8000/batch-status/${jobId}`);
+        
+        if (!statusResponse.ok) {
+          throw new Error("Failed to check job status");
+        }
+
         const statusData: ProcessBatchResponse = await statusResponse.json();
         
         onProgressUpdate(statusData);
@@ -56,7 +72,11 @@ export default function Sidebar({ onGraphUpdate, setLoading, onProgressUpdate, l
             position: { x: 100 * (index % 5), y: 100 * Math.floor(index / 5) }
           }));
 
-          setPaperIds(statusData.result.nodes.map(n => n.id));
+          setPapers(statusData.result.nodes.map(n => ({
+            id: n.id,
+            name: n.data.label
+          })));
+          setLastGeneration({ user, files });
 
           onGraphUpdate({
             nodes: nodesWithPos, 
@@ -65,6 +85,7 @@ export default function Sidebar({ onGraphUpdate, setLoading, onProgressUpdate, l
           processing = false;
         } else if (statusData.status === 'failed') {
           console.error("Graph update failed:", statusData);
+          onError(statusData.error || "Graph update failed with unknown error");
           processing = false;
         } else {
           await new Promise(resolve => setTimeout(resolve, 2000));
@@ -72,18 +93,20 @@ export default function Sidebar({ onGraphUpdate, setLoading, onProgressUpdate, l
       }
     } catch (error) {
       console.error("Graph update failed:", error);
+      onError(error instanceof Error ? error.message : "Failed to update graph");
     } finally {
       setLoading(false);
       onProgressUpdate(null);
     }
   };
 
-  useEffect(() => {
-    if (paperIds.length > 0) {
-      handleUpdateGraph();
-    }
-  }, [user]);
-
+  const hasDifferentFilesThanLastGeneration = () => {
+    if (!lastGeneration) return false;
+    if (files.length !== lastGeneration.files.length) return true;
+    const lastFileNames = new Set(lastGeneration.files.map(f => f.name));
+    return files.some(f => !lastFileNames.has(f.name));
+  }
+  
   const handleGenerateGraph = async () => {
     if (files.length === 0) return;
     
@@ -101,6 +124,10 @@ export default function Sidebar({ onGraphUpdate, setLoading, onProgressUpdate, l
         method: "POST",
         body: formData,
       });
+
+      if (!startResponse.ok) {
+        throw new Error(`Failed to start processing (${startResponse.status})`);
+      }
       
       const startData: ProcessBatchStartResponse = await startResponse.json();
       const jobId = startData.job_id;
@@ -108,6 +135,11 @@ export default function Sidebar({ onGraphUpdate, setLoading, onProgressUpdate, l
       let processing = true;
       while (processing) {
         const statusResponse = await fetch(`http://localhost:8000/batch-status/${jobId}`);
+        
+        if (!statusResponse.ok) {
+          throw new Error("Failed to check job status");
+        }
+
         const statusData: ProcessBatchResponse = await statusResponse.json();
         
         onProgressUpdate(statusData);
@@ -118,7 +150,11 @@ export default function Sidebar({ onGraphUpdate, setLoading, onProgressUpdate, l
             position: { x: 100 * (index % 5), y: 100 * Math.floor(index / 5) }
           }));
 
-          setPaperIds(statusData.result.nodes.map(n => n.id));
+          setPapers(statusData.result.nodes.map(n => ({
+            id: n.id,
+            name: n.data.label
+          })));
+          setLastGeneration({ user, files });
 
           onGraphUpdate({
             nodes: nodesWithPos, 
@@ -127,6 +163,7 @@ export default function Sidebar({ onGraphUpdate, setLoading, onProgressUpdate, l
           processing = false;
         } else if (statusData.status === 'failed') {
           console.error("Job failed:", statusData);
+          onError(statusData.error || "Processing failed with unknown error");
           processing = false;
         } else {
           await new Promise(resolve => setTimeout(resolve, 5000));
@@ -135,6 +172,7 @@ export default function Sidebar({ onGraphUpdate, setLoading, onProgressUpdate, l
       
     } catch (error) {
       console.error("Upload failed:", error);
+      onError(error instanceof Error ? error.message : "Upload failed");
     } finally {
       setLoading(false);
       onProgressUpdate(null);
@@ -173,7 +211,7 @@ export default function Sidebar({ onGraphUpdate, setLoading, onProgressUpdate, l
           {user === 'researcher' && 'Emphasize advanced analysis and technical depth.'}
         </p>
       </div>
-      <div className="mb-8">
+      <div className="mb-4">
         <label className="text-xs font-semibold text-gray-300 uppercase tracking-wider mb-3 block">
           How it works
         </label>
@@ -218,11 +256,27 @@ export default function Sidebar({ onGraphUpdate, setLoading, onProgressUpdate, l
         )}
       </div>
       <button 
-        className="w-full bg-gray-700 cursor-pointer text-white py-3 rounded-lg font-medium hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        disabled={files.length === 0}
-        onClick={handleGenerateGraph}
+        className={`w-full mt-4 cursor-pointer text-white py-3 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+          (files.length > 0 && (papers.length > 0 && (user !== lastGeneration?.user || hasDifferentFilesThanLastGeneration())))
+            ? 'bg-blue-600 hover:bg-blue-700 animate-pulse' 
+            : 'bg-gray-700 hover:bg-gray-800'
+        }`}
+        disabled={files.length === 0 && (papers.length === 0 || user === lastGeneration?.user && !hasDifferentFilesThanLastGeneration()) || loading}
+        onClick={() => {
+          if (files.length > 0) {
+            handleGenerateGraph();
+          } else {
+            handleUpdateGraph();
+          }
+        }}
       >
-        {loading ? "Analyzing..." : "Generate Graph"}
+        {loading ? (
+             "Analyzing..." 
+        ) : (
+          hasDifferentFilesThanLastGeneration() ? "Regenerate with new papers" :
+          papers.length > 0 && user !== lastGeneration?.user ? "Regenerate with new perspective" :
+          "Generate Graph"
+        )}
       </button>
     </div>
   );

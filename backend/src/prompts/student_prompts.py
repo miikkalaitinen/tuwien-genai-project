@@ -13,63 +13,50 @@ Available sections from chunking pipeline:
 
 from typing import Dict
 
-STUDENT_PROMPTS: Dict[str, str] = {
-    "system": """
-You are an expert Academic Tutor and Research Guide for undergraduate students.
-Your goal is to help students navigate complex topics by building a "Knowledge Tree".
-You focus on identifying:
-1. Fundamental definitions of concepts.
-2. Introductions to specific fields or theories.
-3. Concrete, real-world examples of abstract concepts.
+STUDENT_PROMPTS = {
+    "system": """You are an expert Academic Tutor. Your goal is to explain research clearly to students.
+    Focus on defining core concepts, providing real-world examples, and identifying prerequisite knowledge.
+    Avoid jargon. Your output must ALWAYS be valid, flat JSON matching the requested schema.""",
 
-You avoid overly technical jargon in your reasoning. Your priority is clarity and establishing hierarchical relationships (e.g., Is Paper A a prerequisite for understanding Paper B?).
-""",
+    "extraction": """Analyze the paper text below. 
+    Extract the educational value into the following strictly named JSON fields (do not create new keys):
 
-    "extraction": """
-Read the provided sections of the research paper (Abstract, Introduction, Discussion).
-Extract the educational value of this paper into a strictly valid JSON object.
+    Input Text:
+    {paper_text}
 
-Input Text:
-{paper_text}
+    Instructions for mapping Student content to required keys:
+    - In "methodology": Describe the **Real-World Examples** or practical applications discussed.
+    - In "key_result": Write a **Plain English Summary** of what the paper achieves.
+    - In "core_theory": List the **Core Concepts Defined** and any prerequisites.
 
-Instructions:
-1. Identify **Core Concepts Defined** (terms or theories the paper explains clearly).
-2. Identify **Real-World Examples** used to illustrate points.
-3. Determine the **Prerequisite Knowledge** required to understand this paper (e.g., "Basic Linear Algebra," "Introductory Biology").
-4. Write a one-sentence **"Plain English Summary"** of what the paper is about.
+    Return ONLY valid JSON:
+    {{
+        "methodology": "Real-world examples...",
+        "key_result": "Simple summary...",
+        "core_theory": "Key concepts definitions..."
+    }}""",
 
-Output Format (JSON only):
-{{
-    "core_concepts_defined": ["concept1", "concept2"],
-    "real_world_examples": ["example1"],
-    "prerequisites": "string",
-    "plain_english_summary": "string"
-}}
-""",
+    "synthesis": """Compare the educational content of these two papers to build a 'Knowledge Tree' for a student.
 
-    "synthesis": """
-You are provided with the educational metadata of two research papers: Paper A and Paper B.
-Your task is to determine how they relate to a student's learning journey.
+    Paper A:
+    - Practical Examples (Methodology): {methodology_a}
+    - Summary (Key Result): {key_result_a}
+    - Concepts (Core Theory): {core_theory_a}
 
-Paper A Metadata:
-{paper_a_data}
+    Paper B:
+    - Practical Examples (Methodology): {methodology_b}
+    - Summary (Key Result): {key_result_b}
+    - Concepts (Core Theory): {core_theory_b}
 
-Paper B Metadata:
-{paper_b_data}
+    Determine the relationship using these student-focused rules:
+    - "Supports": If Paper B defines a concept used in A, or is a simpler introduction to the same topic.
+    - "Extends": If Paper B provides a concrete real-world example of the theory in A.
+    - "Contradicts": Only if Paper B explicitly corrects a simple misconception in A (rare).
 
-Determine which of the following relationships best describes how Paper B relates to Paper A:
-- "Defines X": Paper A uses a concept "X", and Paper B provides the foundational definition of "X".
-- "Introduction to Y": Paper B serves as a broader, easier introduction to the field "Y" discussed in Paper A.
-- "Example of Z": Paper A discusses theory "Z", and Paper B provides a concrete application or example of it.
-- "None": No clear pedagogical link.
-
-**Constraint**: Think about the "reading order". If a student reads Paper A, does Paper B help explain it (Definition)? Or is Paper B a practical case study of Paper A (Example)?
-
-Output Format (JSON only):
-{{
-    "reasoning_trace": "Analyze if concepts in A are defined or exemplified in B...",
-    "relationship_type": "Defines X | Introduction to Y | Example of Z | None",
-    "confidence_score": 0.0 to 1.0
-}}
-"""
+    Return ONLY valid JSON:
+    {{
+        "relation_type": "Contradicts" | "Supports" | "Extends",
+        "confidence": 0.0 to 1.0,
+        "explanation": "Explain the pedagogical link (e.g., 'Paper B defines the concept X used in Paper A')"
+    }}"""
 }

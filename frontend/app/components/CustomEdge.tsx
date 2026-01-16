@@ -8,7 +8,7 @@ const CustomEdge = ({ id, sourceX, sourceY, targetX, targetY, style, markerEnd, 
   const threeQuarterX = sourceX + (targetX - sourceX) * 0.75;
   const threeQuarterY = sourceY + (targetY - sourceY) * 0.75;
 
-  const angle = Math.atan2(targetY - sourceY, targetX - sourceX);
+  const angle = Math.atan2(sourceY - targetY, sourceX - targetX);
   const arrowLength = 16;
 
   function getArrowPoints(x: number, y: number, angle: number) {

@@ -89,7 +89,8 @@ def prepare_paper_text(paper: dict[str, Any], sections_to_use: list[str] | None 
 
 def process_single_paper(
     paper: dict[str, Any],
-    store_embedding: bool = False
+    store_embedding: bool = False,
+    mode: Literal["student", "researcher"] = "student"
 ) -> dict[str, Any]:
     """
     Process a single paper: extract metadata and optionally store embedding.
@@ -97,6 +98,7 @@ def process_single_paper(
     Args:
         paper: Paper dictionary from processed_papers.json
         store_embedding: Whether to store the paper in ChromaDB
+        mode: Extraction mode ("student" or "researcher")
         
     Returns:
         Dictionary with paper info and extracted metadata:
@@ -107,10 +109,6 @@ def process_single_paper(
             "sections": dict,
             "extraction_success": bool
         }
-        
-    Note:
-        Mode is not passed here as extract_paper_metadata uses student prompts
-        by default. Mode is applied during relationship synthesis.
     """
     filename = paper.get("filename", "Unknown")
     
@@ -126,7 +124,7 @@ def process_single_paper(
             "error": "ingestion_failed"
         }
 
-    logger.info(f"Processing paper: {filename}")
+    logger.info(f"Processing paper: {filename} in {mode} mode")
     
     # Prepare text for extraction - limit to ~4000 chars to stay within Groq free tier (6000 tokens)
     paper_text = prepare_paper_text(paper)
@@ -149,8 +147,8 @@ def process_single_paper(
         return result
     
     try:
-        # Call extraction function (uses student prompts by default)
-        extracted = extract_paper_metadata(paper_text)
+        # Call extraction function
+        extracted = extract_paper_metadata(paper_text, mode=mode)
         
         if extracted:
             result["metadata"] = extracted.model_dump() if hasattr(extracted, "model_dump") else extracted
@@ -160,12 +158,20 @@ def process_single_paper(
             # Optionally store in vector database
             if store_embedding:
                 try:
+                    # Prepare metadata for storage (include original filename)
+                    storage_metadata = result["metadata"].copy()
+                    if paper.get("original_filename"):
+                        storage_metadata["original_filename"] = paper.get("original_filename")
+                    
+                    # Store in mode-specific collection
+                    collection_name = f"paper_embeddings_{mode}"
                     store_paper_embedding(
                         paper_id=filename,
                         paper_text=paper_text[:4000],  # Limit text length for embedding
-                        metadata=result["metadata"]
+                        metadata=storage_metadata,
+                        collection_name=collection_name
                     )
-                    logger.info(f"Stored embedding for: {filename}")
+                    logger.info(f"Stored embedding for: {filename} in '{collection_name}'")
                 except Exception as e:
                     logger.warning(f"Failed to store embedding for {filename}: {e}")
         else:
@@ -180,7 +186,8 @@ def process_single_paper(
 def process_papers_for_graph(
     json_path: str | Path,
     store_embeddings: bool = False,
-    limit: int | None = None
+    limit: int | None = None,
+    mode: Literal["student", "researcher"] = "student"
 ) -> list[dict[str, Any]]:
     """
     Process all papers from processed_papers.json for graph building.
@@ -189,6 +196,7 @@ def process_papers_for_graph(
         json_path: Path to processed_papers.json
         store_embeddings: Whether to store papers in ChromaDB
         limit: Optional limit on number of papers to process
+        mode: "student" or "researcher"
         
     Returns:
         List of processed paper dictionaries with extracted metadata
@@ -200,7 +208,7 @@ def process_papers_for_graph(
     
     processed = []
     for paper in papers:
-        result = process_single_paper(paper, store_embedding=store_embeddings)
+        result = process_single_paper(paper, store_embedding=store_embeddings, mode=mode)
         processed.append(result)
     
     successful = sum(1 for p in processed if p["extraction_success"])
@@ -307,14 +315,21 @@ def build_paper_graph(
     
     if use_similar_papers:
         # Use ChromaDB to find similar papers (more efficient for large datasets)
+        collection_name = f"paper_embeddings_{mode}"
         for paper in valid_papers:
             try:
+                # Use paper text (from metadata or section) for query, or filename as fallback
+                # Ideally we should use the abstract
+                query_text = paper.get("metadata", {}).get("key_result", "") or paper["filename"]
+                
                 similar = find_similar_papers(
-                    paper["filename"],
-                    n_results=5
+                    query_text=query_text,
+                    n_results=5,
+                    collection_name=collection_name
                 )
                 # Compare only with similar papers
-                for sim_id in similar:
+                for sim_item in similar:
+                    sim_id = sim_item.get("id")
                     sim_paper = next((p for p in valid_papers if p["filename"] == sim_id), None)
                     if sim_paper and sim_paper["filename"] != paper["filename"]:
                         rel = synthesize_paper_relationship(paper, sim_paper, mode=mode)
@@ -401,11 +416,12 @@ if __name__ == "__main__":
     print(f"   Mode:   {args.mode} (for relationship synthesis)")
     print(f"   Limit:  {args.limit or 'all papers'}")
     
-    # Process papers (extraction uses student prompts by default)
+    # Process papers (extraction uses specified mode prompts)
     processed = process_papers_for_graph(
         json_path=args.input,
         store_embeddings=args.store_embeddings,
-        limit=args.limit
+        limit=args.limit,
+        mode=args.mode
     )
     
     # Build graph

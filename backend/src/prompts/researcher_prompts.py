@@ -13,64 +13,51 @@ Available sections from chunking pipeline:
 
 from typing import Dict
 
-RESEARCHER_PROMPTS: Dict[str, str] = {
-    "system": """
-You are a Senior Technical Reviewer for a top-tier scientific journal. 
-Your goal is to critically analyze research papers to identify:
-1. Methodological flaws or conflicts.
-2. Direct contradictions in results compared to prior work.
-3. Incremental theoretical extensions.
-4. Specific gaps in the current state-of-the-art.
+RESEARCHER_PROMPTS = {
+    "system": """You are a Senior Technical Reviewer for a top-tier scientific journal.
+    Your goal is to identifying methodological flaws, direct result contradictions, and specific theoretical gaps.
+    You do not care about high-level summaries. You focus on the 'how' (methodology) and the exact 'what' (quantitative results).
+    Your output must ALWAYS be valid, flat JSON matching the requested schema.""",
 
-You do not care about high-level summaries. You care about the "how" (methodology) and the exact "what" (quantitative results).
-You must remain objective and skeptical. Never invent connections that are not explicitly supported by the text.
-""",
+    "extraction": """Analyze the paper text below. 
+    Extract the critical technical metadata into the following strictly named JSON fields (do not create new keys):
 
-    "extraction": """
-Analyze the provided text sections of the research paper (Abstract, Methodology, Results, Discussion).
-Extract the following critical metadata into a strictly valid JSON object.
+    Input Text:
+    {paper_text}
 
-Input Text:
-{paper_text}
+    Instructions for mapping Researcher content to required keys:
+    - In "methodology": Describe the specific **Algorithm/Protocol** used AND any stated **Limitations**.
+    - In "key_result": State the **Key Quantitative Result** (e.g., 'p<0.05', '95% accuracy') and the Main Claim.
+    - In "core_theory": Define the underlying **Mathematical Model** or Architectural Framework.
 
-Instructions:
-1. Identify the specific **Methodology** used (e.g., "Transformer architecture," "Double-blind randomized control trial").
-2. Extract the **Key Quantitative Result** (e.g., "Achieved 95% accuracy," "p-value < 0.05").
-3. Identify the **Main Claim** or hypothesis.
-4. List any explicitly stated **Limitations**.
+    Return ONLY valid JSON:
+    {{
+        "methodology": "Specific protocol and limitations...",
+        "key_result": "Quantitative findings...",
+        "core_theory": "Theoretical framework..."
+    }}""",
 
-Output Format (JSON only):
-{{
-    "methodology_type": "string",
-    "key_result_quantitative": "string",
-    "main_claim": "string",
-    "limitations": "string"
-}}
-""",
+    "synthesis": """Compare the technical evidence of these two papers to determine their rigorous academic relationship.
 
-    "synthesis": """
-You are provided with the extracted metadata and key sections from two different research papers: Paper A and Paper B.
-Your task is to determine the precise academic relationship between them based *only* on the provided evidence.
+    Paper A:
+    - Method/Limits (Methodology): {methodology_a}
+    - Quant Results (Key Result): {key_result_a}
+    - Framework (Core Theory): {core_theory_a}
 
-Paper A Metadata:
-{paper_a_data}
+    Paper B:
+    - Method/Limits (Methodology): {methodology_b}
+    - Quant Results (Key Result): {key_result_b}
+    - Framework (Core Theory): {core_theory_b}
 
-Paper B Metadata:
-{paper_b_data}
+    Determine the relationship using these strict reviewer rules:
+    - "Contradicts": If Paper B explicitly refutes Paper A's claim or reports significantly lower results on the same benchmark.
+    - "Supports": If Paper B applies the **same methodology** to validate A, or reproduces A's results (Replication).
+    - "Extends": If Paper B proposes a novel improvement, generalization, or theoretical expansion of A.
 
-Determine which of the following relationships best describes how Paper B relates to Paper A:
-- "Contradicts results of": Paper B presents evidence that refutes Paper A's claim.
-- "Uses same methodology as": Paper B applies the exact same method (e.g., specific algorithm or lab protocol) as Paper A.
-- "Extends theory of": Paper B builds directly upon the theoretical framework established in Paper A.
-- "None": No significant critical relationship found.
-
-**Constraint**: You must provide a "reasoning_trace" citing specific differences in methodology or results before selecting the relationship.
-
-Output Format (JSON only):
-{{
-    "reasoning_trace": "Compare Method A vs Method B and Result A vs Result B...",
-    "relationship_type": "Contradicts results of | Uses same methodology as | Extends theory of | None",
-    "confidence_score": 0.0 to 1.0
-}}
-"""
+    Return ONLY valid JSON:
+    {{
+        "relation_type": "Contradicts" | "Supports" | "Extends",
+        "confidence": 0.0 to 1.0,
+        "explanation": "State the specific methodological delta or conflict (e.g., 'Paper B refutes A's results on dataset X')"
+    }}"""
 }

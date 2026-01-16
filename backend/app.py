@@ -29,9 +29,13 @@ logger = logging.getLogger("uvicorn")
 UPLOAD_DIR = Path("data")
 UPLOAD_DIR.mkdir(exist_ok=True)
 
+class PaperItem(BaseModel):
+    id: str
+    name: str
+
 class GraphRequest(BaseModel):
     mode: Literal["student", "researcher"] = "student"
-    paper_ids: Optional[List[str]] = None
+    papers: Optional[List[PaperItem]] = None
 
 app = FastAPI(
     title="Research Paper Navigator API",
@@ -50,7 +54,6 @@ async def startup_event():
     if not os.getenv("GOOGLE_API_KEY") or "your-key-here" in os.getenv("GOOGLE_API_KEY"):
         logger.warning("GOOGLE_API_KEY is missing! Using HuggingFace fallback for embeddings, (SLOW!)")
 
-# CORS for frontend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000"],
@@ -66,6 +69,8 @@ def process_batch_task(job_id: str, files_info: List[Dict[str, Any]], user_type:
     logger.info(f"Job {job_id}: Started processing {len(files_info)} files")
     processed_files = []
     
+    graph_mode = user_type if user_type in ["student", "researcher"] else "student"
+    
     try:
         job_store[job_id]["status"] = "processing"
         total_files = len(files_info)
@@ -78,12 +83,12 @@ def process_batch_task(job_id: str, files_info: List[Dict[str, Any]], user_type:
             job_store[job_id]["current_file"] = original_name
             
             try:
-                # Check if paper already exists in DB
                 filename = file_path.name
-                existing_papers = get_papers_by_ids([filename])
+                collection_name = f"paper_embeddings_{graph_mode}"
+                existing_papers = get_papers_by_ids([filename], collection_name=collection_name)
                 
                 if existing_papers:
-                    logger.info(f"Paper {original_name} ({filename}) already exists in DB. Skipping processing.")
+                    logger.info(f"Paper {original_name} ({filename}) already exists in DB ({graph_mode}). Skipping processing.")
                     existing = existing_papers[0]
                     processed_files.append({
                         "filename": filename,
@@ -111,7 +116,7 @@ def process_batch_task(job_id: str, files_info: List[Dict[str, Any]], user_type:
                     "sections": sections
                 }
                 
-                result = process_single_paper(paper_data, store_embedding=True)
+                result = process_single_paper(paper_data, store_embedding=True, mode=graph_mode)
                 if result["extraction_success"]:
                     processed_files.append(result)
                     
@@ -125,8 +130,6 @@ def process_batch_task(job_id: str, files_info: List[Dict[str, Any]], user_type:
 
         job_store[job_id]["progress"] = 90
         job_store[job_id]["current_file"] = "Building Graph..."
-        
-        graph_mode = user_type if user_type in ["student", "researcher"] else "student"
         
         graph_data = build_paper_graph(
             processed_papers=processed_files,
@@ -149,7 +152,7 @@ def regenerate_graph_task(job_id: str, request: GraphRequest):
     Background worker function to regenerate graph from existing papers.
     """
     mode = request.mode
-    paper_ids = request.paper_ids
+    requested_papers = request.papers
     
     logger.info(f"Job {job_id}: Regenerating graph in mode: {mode}")
     
@@ -160,24 +163,76 @@ def regenerate_graph_task(job_id: str, request: GraphRequest):
 
         from src.utils import get_all_papers, get_papers_by_ids
         
-        if paper_ids:
-            db_papers = get_papers_by_ids(paper_ids)
+        collection_name = f"paper_embeddings_{mode}"
+        
+        if requested_papers:
+            # Extract IDs from request objects
+            paper_ids = [p.id for p in requested_papers]
+            db_papers = get_papers_by_ids(paper_ids, collection_name=collection_name)
         else:
-            db_papers = get_all_papers()
+            db_papers = get_all_papers(collection_name=collection_name)
         
         processed_papers = []
+        found_ids = set()
+
         for p in db_papers:
+            found_ids.add(p["id"])
             processed_papers.append({
                 "filename": p["id"],
-                "original_filename": p["metadata"].get("original_filename") or p["id"],
+                "original_filename": p["metadata"].get("original_filename"),
                 "metadata": {
                     "methodology": p["metadata"].get("methodology"),
                     "key_result": p["metadata"].get("key_result"),
                     "core_theory": p["metadata"].get("core_theory"),
                 },
-                "file_path": "",
+                "file_path": p["metadata"].get("file_path", ""),
                 "extraction_success": True 
             })
+
+        # Check for missing papers and process them
+        if requested_papers:
+            # Identify which requested papers were not found in DB
+            missing_papers = [p for p in requested_papers if p.id not in found_ids]
+            
+            if missing_papers:
+                total_missing = len(missing_papers)
+                logger.info(f"Found {total_missing} papers missing from {mode} DB. Processing from disk...")
+                
+                for i, missing_paper in enumerate(missing_papers):
+                    job_store[job_id]["progress"] = 10 + int((i / total_missing) * 40)
+                    job_store[job_id]["current_file"] = f"Processing {missing_paper.name}..."
+                    
+                    file_path = UPLOAD_DIR / missing_paper.id
+                    if not file_path.exists():
+                        logger.warning(f"Paper {missing_paper.id} not found on disk. Skipping.")
+                        continue
+                    
+                    try:
+                        # Use provided name from request
+                        original_name = missing_paper.name
+                        
+                        ingestor = PDFIngestor(str(file_path))
+                        full_markdown = ingestor.extract_clean_text()
+                        
+                        chunker = SemanticChunker()
+                        sections = chunker.split_by_section(full_markdown)
+                        
+                        paper_data = {
+                            "filename": missing_paper.id,
+                            "original_filename": original_name,
+                            "metadata": {
+                                "file_path": str(file_path),
+                                "original_filename": original_name
+                            },
+                            "sections": sections
+                        }
+                        
+                        result = process_single_paper(paper_data, store_embedding=True, mode=mode)
+                        if result["extraction_success"]:
+                            processed_papers.append(result)
+
+                    except Exception as e:
+                        logger.error(f"Failed to process missing paper {missing_paper.name}: {e}")
 
         job_store[job_id]["progress"] = 50
         job_store[job_id]["current_file"] = "Building Graph..."
@@ -298,27 +353,3 @@ async def make_graph(request: GraphRequest, background_tasks: BackgroundTasks):
         "status": "queued",
         "message": "Graph regeneration started."
     }
-    
-@app.get("/search")
-def search_papers(query: str, limit: int = 5):
-    """
-    Performs semantic search across the uploaded papers.
-    """
-    logger.info(f"Semantic searching for: {query}")
-    
-    try:
-        results = find_similar_papers(query, n_results=limit)
-        
-        formatted_results = []
-        for r in results:
-            formatted_results.append({
-                "paper_id": r["id"],
-                "excerpt": r["text"][:200] + "...",
-                "score": r["distance"]
-            })
-            
-        return {"results": formatted_results}
-        
-    except Exception as e:
-        logger.error(f"Search failed: {e}")
-        raise HTTPException(status_code=500, detail="Search engine error")

@@ -4,105 +4,53 @@
 
 A "Connection Discovery Engine" that visualizes how research papers relate to each other based on user intent (Student vs Researcher mode).
 
+## ✨ Features
+
+- **📄 PDF Upload** - Drag & drop research papers for automatic processing
+- **🔍 Two Modes**:
+  - **Student Mode** - Conceptual bridging with educational explanations
+  - **Researcher Mode** - Rigorous technical analysis with causal chains
+- **🕸️ Interactive Graph** - Color-coded relationship visualization:
+  - 🟢 Green = Supports
+  - 🔴 Red = Contradicts
+  - 🔵 Blue = Extends
+- **💡 Click-to-Explore** - View paper details and relationship explanations
+
 ---
 
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Python 3.10+
+- Docker Desktop
 - [LlamaCloud API Key](https://cloud.llamaindex.ai/) (for PDF parsing)
 - [Groq API Key](https://console.groq.com/keys) (for LLM - free tier available)
 
-### Backend Setup
+### Setup
 
 ```bash
-cd backend
+# Clone and configure
+git clone https://github.com/miikkalaitinen/tuwien-genai-project
+cd tuwien-genai-project
 
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
+# Set up API keys
+cp backend/.env.example backend/.env
+# Edit backend/.env with your keys
 
-# Install dependencies
-pip install -r requirements.txt
-
-# Configure API keys (copy from template)
-cp .env.example .env
-# Then edit .env with your actual keys
+# Run with Docker Compose
+docker compose up --build
 ```
 
-### Add PDFs to Process
-
-Place your research papers in `backend/data/`:
-```
-backend/data/
-├── paper1.pdf
-├── paper2.pdf
-└── ...
-```
+Then open **http://localhost:3000** in your browser.
 
 ---
 
-## 📦 Pipeline Usage
+## 🎯 How to Use
 
-### Step 1: Process PDFs → Structured JSON
-```bash
-cd backend
-python -m src.batch_processor --data-dir data/ --output processed_papers.json --verbose
-```
-
-This extracts text from PDFs and splits into semantic sections (abstract, introduction, methodology, etc.)
-
-### Step 2: Generate Relationship Graph
-```bash
-python -m src.integration -o paper_graph.json -l 5
-```
-
-Options:
-- `-o, --output`: Output file path (default: `paper_graph.json`)
-- `-l, --limit`: Limit number of papers to process (useful for testing)
-- `-i, --input`: Input JSON file (default: `processed_papers.json`)
-
-### Additional Commands
-
-**Process specific paper:**
-```bash
-python -m src.batch_processor --filter "HyperDrive"
-```
-
-**Check data quality:**
-```bash
-python check_quality.py
-```
-
-**Inspect extracted sections:**
-```bash
-cd ..  # Return to project root
-python inspect_extraction.py HyperDrive                    # Check methodology
-python inspect_extraction.py --section results FOOL        # Check results
-python inspect_extraction.py --section abstract --full "Federated"  # Full content
-```
-
-**Run integration tests:**
-```bash
-python test_integration.py
-```
-
----
-
-## 🔄 Data Flow
-
-```
-┌─────────────┐    ┌─────────────┐    ┌──────────────────────┐    ┌─────────────────┐
-│  PDF Files  │───▶│ LlamaParse  │───▶│  Semantic Chunking   │───▶│ processed_      │
-│  (data/)    │    │  API        │    │  (sections)          │    │ papers.json     │
-└─────────────┘    └─────────────┘    └──────────────────────┘    └────────┬────────┘
-                                                                           │
-                                                                           ▼
-┌─────────────┐    ┌─────────────┐    ┌──────────────────────┐    ┌─────────────────┐
-│  React Flow │◀───│  FastAPI    │◀───│  Relationship        │◀───│ Integration     │
-│  (frontend) │    │  Endpoints  │    │  Synthesis (LLM)     │    │ Module          │
-└─────────────┘    └─────────────┘    └──────────────────────┘    └─────────────────┘
-```
+1. **Upload PDFs** - Use the sidebar to upload your research papers
+2. **Select Mode** - Choose between Student (educational) or Researcher (technical)
+3. **Generate Graph** - Click "Generate" to process papers and build relationships
+4. **Explore** - Click on nodes to see paper details, edges to see explanations
+5. **Switch Modes** - Toggle mode and regenerate to see different relationship perspectives
 
 ---
 
@@ -110,30 +58,70 @@ python test_integration.py
 
 ```
 backend/
-├── app.py                    # FastAPI entry point (Miikka) ⏳
+├── app.py                    # FastAPI server with async job processing
 ├── src/
-│   ├── batch_processor.py    # Batch PDF processing CLI (Jaime) ✅
-│   ├── integration.py        # Pipeline → Graph bridge (Jaime) ✅
-│   ├── utils.py              # LLM, ChromaDB, schemas (Marta) ✅
+│   ├── batch_processor.py    # Batch PDF processing CLI
+│   ├── integration.py        # Pipeline → Graph bridge
+│   ├── utils.py              # LLM, ChromaDB, schemas
 │   ├── components/
-│   │   ├── pdf_ingestion.py  # PDF → Markdown (Jaime) ✅
-│   │   ├── chunking.py       # Semantic sections (Jaime) ✅
-│   │   ├── connection_engine.py  # LLM relationships (Marta) ✅
-│   │   └── graph_builder.py  # Graph data (Miikka) ⏳
+│   │   ├── pdf_ingestion.py  # PDF → Markdown (LlamaParse)
+│   │   ├── chunking.py       # Semantic section extraction
+│   │   └── connection_engine.py  # LLM relationship synthesis
 │   └── prompts/
-│       ├── student_prompts.py    # Student mode (Aarne) ⏳
-│       └── researcher_prompts.py # Researcher mode (Aarne) ⏳
-├── data/                     # Your PDFs (gitignored)
-├── processed_papers.json     # Extracted paper data
+│       ├── student_prompts.py    # Academic tutor persona
+│       └── researcher_prompts.py # Principal investigator persona
+├── local_models/             # Local HuggingFace embedding model
+├── chroma_db/                # Vector store for embeddings
 └── .env.example              # API key template
 
-frontend/                     # React + Next.js (Miikka)
+frontend/
 ├── app/
-│   ├── components/
-│   │   ├── GraphCanvas.tsx   # React Flow visualization ⏳
-│   │   └── Sidebar.tsx       # Mode toggle & upload ⏳
-│   └── page.tsx
+│   ├── page.tsx              # Main application page
+│   ├── types.ts              # TypeScript interfaces
+│   └── components/
+│       ├── GraphCanvas.tsx   # ReactFlow visualization
+│       ├── Sidebar.tsx       # Upload & mode controls
+│       ├── NodeModal.tsx     # Paper details popup
+│       ├── EdgeModal.tsx     # Relationship details popup
+│       ├── CustomEdge.tsx    # Color-coded edge rendering
+│       └── ErrorBanner.tsx   # Toast notifications
+├── Dockerfile
 └── package.json
+
+docker-compose.yml            # One-command deployment
+```
+
+---
+
+## � Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              FRONTEND (Next.js)                             │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐ │
+│  │   Sidebar   │  │ GraphCanvas │  │  NodeModal  │  │     EdgeModal       │ │
+│  │  (Upload)   │  │ (ReactFlow) │  │  (Details)  │  │  (Relationships)    │ │
+│  └──────┬──────┘  └──────▲──────┘  └─────────────┘  └─────────────────────┘ │
+└─────────┼────────────────┼──────────────────────────────────────────────────┘
+          │ POST /process-batch     │ GET /batch-status
+          ▼                         │
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                            BACKEND (FastAPI)                                │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │                        Async Job Processing                          │   │
+│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────────┐   │   │
+│  │  │  LlamaParse  │─▶│   Chunking   │─▶│   Connection Engine      │   │   │
+│  │  │  (PDF→Text)  │  │  (Sections)  │  │   (LLM Relationships)    │   │   │
+│  │  └──────────────┘  └──────────────┘  └──────────────────────────┘   │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                    │                                        │
+│              ┌─────────────────────┼─────────────────────┐                  │
+│              ▼                     ▼                     ▼                  │
+│  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐          │
+│  │  Student Prompts │  │ Researcher Prompts│  │    ChromaDB      │          │
+│  │  (Conceptual)    │  │  (Technical)      │  │   (Embeddings)   │          │
+│  └──────────────────┘  └──────────────────┘  └──────────────────┘          │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -144,52 +132,35 @@ frontend/                     # React + Next.js (Miikka)
 |-----|---------|-----------|
 | `LLAMA_CLOUD_API_KEY` | PDF parsing | [cloud.llamaindex.ai](https://cloud.llamaindex.ai/) |
 | `GROQ_API_KEY` | LLM (Llama 3.1) | [console.groq.com](https://console.groq.com/keys) |
-| `GOOGLE_API_KEY` | Gemini fallback (optional) | [aistudio.google.com](https://aistudio.google.com/) |
+| `GOOGLE_API_KEY` | Embeddings (optional - local fallback available) | [aistudio.google.com](https://aistudio.google.com/) |
+
+---
+
+## 🛠️ Tech Stack
+
+| Layer | Technology |
+|-------|------------|
+| **Frontend** | Next.js 16, React 19, ReactFlow, Tailwind CSS |
+| **Backend** | Python 3.10, FastAPI, LlamaIndex |
+| **LLM** | Groq (Llama 3.1 70B) |
+| **Embeddings** | HuggingFace (all-MiniLM-L6-v2) / Google Gemini |
+| **Vector Store** | ChromaDB |
+| **PDF Parsing** | LlamaParse |
+| **Deployment** | Docker Compose |
 
 ---
 
 ## 👥 Team
 
-| Member | Role | Modules | Status |
-|--------|------|---------|--------|
-| **Jaime** | Data Pipeline Engineer | `pdf_ingestion.py`, `chunking.py`, `batch_processor.py`, `integration.py` | ✅ Complete |
-| **Marta** | AI Backend Architect | `connection_engine.py`, `utils.py` | ✅ Complete |
-| **Aarne** | Prompt Engineer & QA | `prompts/`, `tests/evaluation.py` | ⏳ In Progress |
-| **Miikka** | Frontend Developer | `app.py`, `graph_builder.py`, `frontend/` | ⏳ In Progress |
+| Member | Role | Contributions |
+|--------|------|---------------|
+| **Jaime** | Data Pipeline Engineer | PDF ingestion, chunking, batch processor, integration |
+| **Marta** | AI Backend Architect | Connection engine, RAG functions, ChromaDB integration |
+| **Aarne** | Prompt Engineer | Student & researcher prompts, evaluation |
+| **Miikka** | Full-Stack Developer | FastAPI server, frontend, Docker setup |
 
 ---
 
-## 📤 Output Format
+## 📜 License
 
-The `paper_graph.json` output is compatible with React Flow:
-
-```json
-{
-  "nodes": [
-    {
-      "id": "paper_0",
-      "type": "default",
-      "position": {"x": 0, "y": 0},
-      "data": {
-        "label": "Paper Title",
-        "methodology": "Experimental study",
-        "key_result": "Main finding",
-        "core_theory": "Theoretical framework"
-      }
-    }
-  ],
-  "edges": [
-    {
-      "id": "edge_0_1",
-      "source": "paper_0",
-      "target": "paper_1",
-      "label": "Extends",
-      "data": {
-        "relation_type": "Extends",
-        "confidence": 0.85,
-        "explanation": "Paper B extends the methodology of Paper A..."
-      }
-    }
-  ]
-}
-```
+MIT License - TU Wien Generative AI Course 2025/26

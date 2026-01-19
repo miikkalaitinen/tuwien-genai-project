@@ -278,6 +278,7 @@ def get_or_create_collection(
     """
     collection = client.get_or_create_collection(
         name=collection_name,
+        embedding_function=None,
         metadata={"description": "Research paper embeddings for similarity search"}
     )
     

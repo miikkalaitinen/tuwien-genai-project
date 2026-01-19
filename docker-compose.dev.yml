@@ -4,23 +4,30 @@ services:
   backend:
     build:
       context: ./backend
+      dockerfile: Dockerfile.dev
     platform: linux/amd64
     ports:
       - "8000:8000"
+    volumes:
+      - ./backend:/app
     env_file:
       - ./backend/.env
 
   frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile
-      args:
-        NEXT_PUBLIC_API_URL: http://backend:8000
+      dockerfile: Dockerfile.dev
     container_name: nextjs_frontend
     platform: linux/amd64
     ports:
       - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
     environment:
-      - NEXT_PUBLIC_API_URL=http://backend:8000
+      - CHOKIDAR_USEPOLLING=true
+      - WATCHPACK_POLLING=true
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
     depends_on:
       - backend
+    command: npm run dev

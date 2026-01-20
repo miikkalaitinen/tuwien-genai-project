@@ -65,10 +65,6 @@ export default function GraphCanvas({ nodes: initialNodes, edges: initialEdges, 
           strokeWidth: 2,
           strokeDasharray: '0',
         },
-        markerEnd: {
-          type: MarkerType.ArrowClosed,
-          color: color,
-        },
         label: relationType !== 'Default' ? relationType : '',
         data: { ...edge.data },
       };
